@@ -14,7 +14,7 @@ export const useBillboards = (storeId: string, page = 1, limit = 20) => {
       const { data } = await apiClient.get(
         `/stores/${storeId}/billboards?page=${page}&limit=${limit}`
       );
-      return data;
+      return data.data;
     },
     enabled: !!storeId,
   });

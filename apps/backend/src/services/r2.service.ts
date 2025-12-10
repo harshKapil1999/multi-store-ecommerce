@@ -19,7 +19,11 @@ export class R2Service {
 
   constructor(config: R2Config) {
     this.bucketName = config.bucketName;
-    this.baseUrl = `https://${config.bucketName}.${config.accountId}.r2.cloudflarestorage.com`;
+    // Use R2_PUBLIC_URL if available, otherwise fallback to R2 dev URL
+    const publicUrl = process.env.R2_PUBLIC_URL || process.env.CLOUDFLARE_PUBLIC_URL;
+    this.baseUrl = publicUrl
+      ? publicUrl.replace(/\/$/, '')
+      : `https://${config.bucketName}.${config.accountId}.r2.cloudflarestorage.com`;
 
     this.client = new S3Client({
       region: 'auto',
@@ -101,7 +105,7 @@ export function initializeR2Service(): R2Service {
   if (missing.length > 0) {
     throw new Error(
       `Missing environment variables: ${missing.join(', ')}. ` +
-        `Please set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_ACCESS_KEY_ID, CLOUDFLARE_SECRET_ACCESS_KEY, and CLOUDFLARE_BUCKET_NAME`
+      `Please set CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_ACCESS_KEY_ID, CLOUDFLARE_SECRET_ACCESS_KEY, and CLOUDFLARE_BUCKET_NAME`
     );
   }
 

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import type { Store as StoreType } from '@repo/types';
 
-export interface IStore extends Omit<StoreType, '_id'>, Document {}
+export interface IStore extends Omit<StoreType, '_id'>, Document { }
 
 const storeSchema = new Schema<IStore>(
   {
@@ -22,11 +22,11 @@ const storeSchema = new Schema<IStore>(
     },
     description: {
       type: String,
-      required: true,
+      //required: true,
     },
     logo: {
       type: String,
-      required: true,
+      required: false,
     },
     owner: {
       type: String,

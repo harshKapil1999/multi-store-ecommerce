@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/index';
-import { Loader2, ArrowRight, Store, Package, ShoppingCart } from 'lucide-react';
+import { Loader2, ArrowRight, Store, Package, ShoppingCart, TrendingUp, Users, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function LandingPage() {
@@ -20,35 +20,39 @@ export default function LandingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin mx-auto text-blue-600 mb-4" />
-          <p className="text-slate-600">Loading...</p>
+          <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Navigation */}
-      <nav className="border-b border-slate-700 bg-slate-900/50 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Navbar */}
+      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-black/50 backdrop-blur-xl">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <Store className="h-8 w-8 text-blue-500" />
-            <span className="text-xl font-bold text-white">Admin Dashboard</span>
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <Store className="h-5 w-5 text-white" />
+            </div>
+            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+              Admin Console
+            </span>
           </div>
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <Link href="/dashboard">
-                <Button>
-                  Go to Dashboard
+                <Button className="bg-white text-black hover:bg-white/90 font-semibold rounded-full px-6">
+                  Dashboard
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
             ) : (
               <Link href="/login">
-                <Button>
+                <Button className="bg-white text-black hover:bg-white/90 font-semibold rounded-full px-6">
                   Sign In
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
@@ -56,24 +60,36 @@ export default function LandingPage() {
             )}
           </div>
         </div>
-      </nav>
+      </header>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="text-center space-y-8">
-          <div className="space-y-4">
-            <h1 className="text-5xl md:text-6xl font-bold text-white">
-              Multi-Store <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">eCommerce</span> Admin
-            </h1>
-            <p className="text-xl text-slate-400 max-w-2xl mx-auto">
-              Manage multiple stores, products, orders, and inventory from a single powerful dashboard.
-            </p>
-          </div>
+      <main className="flex-1 pt-24 pb-16 relative overflow-hidden flex flex-col items-center justify-center">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-black -z-10">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-indigo-500/20 via-purple-500/10 to-transparent blur-3xl opacity-50" />
+          <div className="absolute bottom-0 left-0 right-0 h-96 bg-gradient-to-t from-black to-transparent" />
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
+        <div className="container relative z-10 px-4 sm:px-6 lg:px-8 text-center max-w-5xl mx-auto">
+          <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white/70 backdrop-blur-xl mb-8 animate-fade-in-up">
+            <ShieldCheck className="h-4 w-4 mr-2 text-emerald-400" />
+            Secure Enterprise Gateway
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 bg-clip-text text-transparent bg-gradient-to-b from-white via-white/90 to-white/50">
+            Control Center for <br className="hidden md:block" />
+            Modern Commerce
+          </h1>
+          
+          <p className="text-lg md:text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
+            Orchestrate your multi-store empire from a single, powerful interface. 
+            Real-time analytics, inventory management, and global scale at your fingertips.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
             <Link href={isAuthenticated ? '/dashboard' : '/login'}>
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                {isAuthenticated ? 'Go to Dashboard' : 'Sign In'}
+              <Button size="lg" className="h-14 px-8 text-base bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-500/25 transition-all hover:scale-105 border-0">
+                {isAuthenticated ? 'Enter Dashboard' : 'Access Console'}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -81,93 +97,49 @@ export default function LandingPage() {
               href="https://github.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-8 py-3 rounded-lg border border-slate-600 text-white font-medium hover:bg-slate-800 transition"
+              className="h-14 px-8 inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-base font-medium text-white backdrop-blur-sm transition-all hover:bg-white/10"
             >
-              View Docs
+              Documentation
             </a>
           </div>
-        </div>
-      </section>
 
-      {/* Features Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-slate-700">
-        <h2 className="text-3xl font-bold text-white text-center mb-12">Powerful Features</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Feature 1 */}
-          <div className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-blue-500/50 hover:bg-slate-800/80 transition group">
-            <Store className="h-12 w-12 text-blue-500 mb-4 group-hover:scale-110 transition" />
-            <h3 className="text-xl font-semibold text-white mb-2">Multi-Store Management</h3>
-            <p className="text-slate-400">
-              Manage multiple stores, each with their own products, orders, and customization. Scale your business with ease.
-            </p>
-          </div>
-
-          {/* Feature 2 */}
-          <div className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-cyan-500/50 hover:bg-slate-800/80 transition group">
-            <Package className="h-12 w-12 text-cyan-500 mb-4 group-hover:scale-110 transition" />
-            <h3 className="text-xl font-semibold text-white mb-2">Product Management</h3>
-            <p className="text-slate-400">
-              Create, edit, and manage products with rich media uploads, categorization, and inventory tracking.
-            </p>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="p-6 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-green-500/50 hover:bg-slate-800/80 transition group">
-            <ShoppingCart className="h-12 w-12 text-green-500 mb-4 group-hover:scale-110 transition" />
-            <h3 className="text-xl font-semibold text-white mb-2">Order Tracking</h3>
-            <p className="text-slate-400">
-              Track orders in real-time, manage fulfillment, and communicate with customers all from one place.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Dashboard Preview Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="bg-gradient-to-br from-blue-600/10 to-cyan-600/10 border border-slate-700 rounded-2xl p-12 text-center space-y-4">
-          <h2 className="text-3xl font-bold text-white">Ready to Get Started?</h2>
-          <p className="text-slate-300 max-w-2xl mx-auto">
-            {isAuthenticated
-              ? "You're all set! Head to your dashboard to start managing your stores and products."
-              : 'Sign in with your admin account to access the full dashboard and manage your stores.'}
-          </p>
-          <div className="pt-4">
-            <Link href={isAuthenticated ? '/dashboard' : '/login'}>
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                {isAuthenticated ? 'Go to Dashboard' : 'Sign In'}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Demo Info */}
-      {!isAuthenticated && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-slate-700">
-          <div className="max-w-2xl mx-auto p-6 bg-slate-800/50 border border-slate-700 rounded-xl">
-            <h3 className="text-lg font-semibold text-white mb-4">Demo Credentials</h3>
-            <div className="space-y-3 text-slate-300">
-              <div>
-                <p className="text-sm text-slate-400">Email</p>
-                <code className="text-blue-400 font-mono">admin@example.com</code>
+          {/* Feature Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
+            {[
+              {
+                icon: Store,
+                title: "Multi-Store Architecture",
+                desc: "Manage infinite storefronts with isolated inventories and themes.",
+                color: "text-blue-400"
+              },
+              {
+                icon: TrendingUp,
+                title: "Real-time Analytics",
+                desc: "Live insights into production, sales, and customer engagement.",
+                color: "text-emerald-400"
+              },
+              {
+                icon: Users,
+                title: "Team Collaboration",
+                desc: "Granular roles and permissions for your entire organization.",
+                color: "text-purple-400"
+              }
+            ].map((feature, i) => (
+              <div key={i} className="group relative rounded-2xl border border-white/10 bg-white/5 p-6 hover:bg-white/10 transition-colors">
+                <div className={`mb-4 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 ${feature.color}`}>
+                  <feature.icon className="h-6 w-6" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground">{feature.desc}</p>
               </div>
-              <div>
-                <p className="text-sm text-slate-400">Password</p>
-                <code className="text-blue-400 font-mono">password</code>
-              </div>
-            </div>
+            ))}
           </div>
-        </section>
-      )}
+        </div>
+      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-700 bg-slate-900/50 mt-20 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-slate-400">
-            <p>&copy; 2025 Multi-Store eCommerce Admin Dashboard. All rights reserved.</p>
-          </div>
+      <footer className="border-t border-white/10 bg-black py-8">
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          © {new Date().getFullYear()} E-Commerce Platform. Admin Console.
         </div>
       </footer>
     </div>

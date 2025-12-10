@@ -29,10 +29,10 @@ export function BillboardsPage() {
 
   const columns: ColumnDef<Billboard>[] = [
     {
-      accessorKey: 'order',
+      id: 'dragHandle',
       header: '',
       size: 40,
-      cell: () => <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />,
+      cell: ({ row }) => <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />,
     },
     {
       accessorKey: 'title',

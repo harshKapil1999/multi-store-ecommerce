@@ -36,7 +36,7 @@ export const useGetPresignedUrl = () => {
         contentType,
         size,
       });
-      return data;
+      return data.data;
     },
   });
 };
@@ -48,7 +48,7 @@ export const useConfirmUpload = () => {
   return useMutation({
     mutationFn: async (key: string): Promise<ConfirmUploadResponse> => {
       const { data } = await apiClient.post('/media/confirm', { key });
-      return data;
+      return data.data;
     },
   });
 };

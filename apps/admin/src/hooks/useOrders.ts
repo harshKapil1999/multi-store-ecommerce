@@ -14,7 +14,7 @@ export const useOrders = (storeId?: string, filters?: Partial<OrderFilters>) => 
     queryFn: async () => {
       const endpoint = storeId ? `/orders/store/${storeId}` : `/orders`;
       const { data } = await apiClient.get(endpoint, { params: filters });
-      return data;
+      return data.data;
     },
   });
 };

@@ -85,7 +85,7 @@ export default function DashboardLayout({
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-20'
-        } bg-background dark:bg-slate-950 text-foreground border-r border-border transition-all duration-300 overflow-y-auto flex flex-col fixed left-0 top-0 bottom-0 z-40`}
+        } bg-background text-foreground border-r border-border transition-all duration-300 overflow-y-auto flex flex-col fixed left-0 top-0 bottom-0 z-40`}
       >
         <div className="p-6 flex items-center justify-between">
           {sidebarOpen && <h1 className="text-xl font-bold">Admin</h1>}
@@ -128,7 +128,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className={`flex-1 flex flex-col overflow-hidden ${sidebarOpen ? 'ml-64' : 'ml-20'} transition-all duration-300`}>
         {/* Header */}
-        <header className="bg-background dark:bg-slate-950 border-b border-border h-16 px-4 md:px-6 flex items-center justify-between sticky top-0 z-30">
+        <header className="bg-background/80 backdrop-blur-md border-b border-border h-16 px-4 md:px-6 flex items-center justify-between sticky top-0 z-30">
           <div className="flex items-center gap-4">
             <StoreSwitcher />
           </div>
@@ -137,7 +137,7 @@ export default function DashboardLayout({
             {/* Theme Switcher */}
             <button
               onClick={toggleTheme}
-              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+              className="p-2 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
               aria-label="Toggle theme"
             >
               {theme === 'light' ? (
@@ -151,9 +151,9 @@ export default function DashboardLayout({
             <div className="relative profile-dropdown">
               <button
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2 px-2 md:px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+                className="flex items-center gap-2 px-2 md:px-3 py-2 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
               >
-                <div className="h-8 w-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                   <span className="text-xs font-semibold">
                     {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </span>

@@ -33,7 +33,7 @@ export const useProducts = (storeId: string, filters?: Partial<ProductFilters>) 
       const { data } = await apiClient.get(
         `/stores/${storeId}/products?${params}`
       );
-      return data;
+      return data.data;
     },
     enabled: !!storeId,
   });

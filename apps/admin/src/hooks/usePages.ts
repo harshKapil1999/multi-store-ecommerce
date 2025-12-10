@@ -23,7 +23,7 @@ export const usePages = (storeId: string, published?: boolean) => {
         params.append('published', String(published));
       }
       const { data } = await apiClient.get(`/stores/${storeId}/pages?${params}`);
-      return data;
+      return data.data;
     },
     enabled: !!storeId,
   });
