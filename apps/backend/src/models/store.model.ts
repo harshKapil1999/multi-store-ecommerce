@@ -33,15 +33,38 @@ const storeSchema = new Schema<IStore>(
       index: true,
     },
     theme: {
-      primaryColor: String,
-      secondaryColor: String,
       fontFamily: String,
+    },
+    navigation: [{
+      label: String,
+      href: String,
+      categoryId: String,
+      columns: [{
+        title: String,
+        links: [{
+          label: String,
+          href: String,
+          categoryId: String
+        }]
+      }]
+    }],
+    footer: {
+      sections: [{
+        title: String,
+        links: [{ label: String, href: String }]
+      }],
+      copyright: String,
+      bottomLinks: [{ label: String, href: String }]
     },
     isActive: {
       type: Boolean,
       default: true,
       index: true,
     },
+    homeBillboards: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Billboard'
+    }],
   },
   {
     timestamps: true,

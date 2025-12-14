@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import type { Category as CategoryType } from '@repo/types';
 
-export interface ICategory extends Omit<CategoryType, '_id'>, Document {}
+export interface ICategory extends Omit<CategoryType, '_id'>, Document { }
 
 const categorySchema = new Schema<ICategory>(
   {
@@ -45,6 +45,10 @@ const categorySchema = new Schema<ICategory>(
       default: true,
       index: true,
     },
+    billboards: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Billboard'
+    }],
   },
   {
     timestamps: true,

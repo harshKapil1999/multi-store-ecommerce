@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Button, Card, FormInput, FormTextarea, MediaUpload } from '@/components/index';
+import { Button, Card, FormInput, FormTextarea, MediaUpload, BillboardSelect } from '@/components/index';
 import type { CreateStoreRequest, UpdateStoreRequest, Store } from '@repo/types';
 
 const storeSchema = z.object({
@@ -12,6 +13,7 @@ const storeSchema = z.object({
   domain: z.string().optional(),
   description: z.string().optional(),
   logo: z.string().optional(),
+  homeBillboards: z.array(z.string()).optional(),
 });
 
 type StoreFormData = z.infer<typeof storeSchema>;
@@ -29,6 +31,7 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
     formState: { errors },
     watch,
     setValue,
+    control,
   } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
     defaultValues: store
@@ -38,11 +41,25 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
           domain: store.domain,
           description: store.description,
           logo: store.logo,
+          homeBillboards: store.homeBillboards?.map((b: any) => typeof b === 'string' ? b : b._id) || [],
         }
-      : {},
+      : {
+          homeBillboards: [],
+        },
   });
 
   const nameValue = watch('name');
+
+  // Auto-generate slug from name
+  useEffect(() => {
+    if (!store && nameValue) {
+      const slug = nameValue
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '');
+      setValue('slug', slug);
+    }
+  }, [nameValue, store, setValue]);
 
   const handleFormSubmit = async (data: StoreFormData) => {
     // Remove empty optional fields
@@ -121,6 +138,24 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
           </div>
         </div>
       </Card>
+
+      {store && (
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold mb-4">Home Page Carousel</h3>
+          <Controller
+            name="homeBillboards"
+            control={control}
+            render={({ field }) => (
+              <BillboardSelect
+                storeId={store._id}
+                value={field.value || []}
+                onChange={field.onChange}
+                label="Select carousel slides for the store home page"
+              />
+            )}
+          />
+        </Card>
+      )}
 
       <div className="flex gap-2 justify-end pt-4">
         <Button type="submit" disabled={isLoading}>

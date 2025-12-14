@@ -24,6 +24,7 @@ export const createStoreSchema = z.object({
     })
     .optional(),
   isActive: z.boolean().optional(),
+  homeBillboards: z.array(z.string()).optional(),
 });
 
 export const updateStoreSchema = createStoreSchema.partial();

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // Helper for optional URL fields that transforms empty strings to undefined
-const optionalUrl = z.string().url().optional().or(z.literal('')).transform(val => val === '' ? undefined : val);
+const optionalUrl = z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val);
 const optionalString = z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val);
 
 // Billboard Schemas
@@ -11,6 +11,7 @@ export const createBillboardSchema = z.object({
   title: z.string().min(1, 'title is required').max(200),
   subtitle: optionalString,
   imageUrl: z.string().url('imageUrl must be a valid URL'),
+  categoryId: optionalString,
   ctaText: optionalString,
   ctaLink: optionalUrl,
   order: z.number().int().nonnegative().optional(),
@@ -45,6 +46,7 @@ export const createCategorySchema = z.object({
   isFeatured: z.boolean().optional(),
   order: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
+  billboards: z.array(z.string()).optional(),
 });
 
 export const updateCategorySchema = createCategorySchema.partial();

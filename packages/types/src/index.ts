@@ -22,9 +22,12 @@ export interface Store {
   logo: string; // Cloudflare R2 URL
   owner?: string; // User ID (optional for backwards compatibility)
   theme?: StoreTheme;
+  navigation?: NavItem[];
+  footer?: FooterConfig;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  homeBillboards?: Billboard[]; // Populated
 }
 
 export interface StoreTheme {
@@ -33,10 +36,40 @@ export interface StoreTheme {
   fontFamily: string;
 }
 
+export interface NavLink {
+  label: string;
+  href: string;
+  categoryId?: string;
+}
+
+export interface NavColumn {
+  title: string;
+  links: NavLink[];
+}
+
+export interface NavItem {
+  label: string;
+  href?: string;
+  categoryId?: string;
+  columns?: NavColumn[];
+}
+
+export interface FooterSection {
+  title: string;
+  links: NavLink[];
+}
+
+export interface FooterConfig {
+  sections: FooterSection[];
+  copyright: string;
+  bottomLinks: NavLink[];
+}
+
 // Billboard Types
 export interface Billboard {
   _id: string;
   storeId: string; // Reference to Store
+  categoryId?: string; // Optional reference to Category
   title: string;
   subtitle?: string;
   imageUrl: string; // Cloudflare R2 URL
@@ -108,6 +141,11 @@ export interface Category {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  billboards?: Billboard[]; // Populated
+}
+
+export interface CategoryWithChildren extends Category {
+  children: CategoryWithChildren[];
 }
 
 // Order Types
@@ -226,6 +264,7 @@ export interface CreateBillboardInput {
   title: string;
   subtitle?: string;
   imageUrl: string;
+  categoryId?: string;
   ctaText?: string;
   ctaLink?: string;
   order?: number;
@@ -236,6 +275,7 @@ export interface UpdateBillboardInput {
   title?: string;
   subtitle?: string;
   imageUrl?: string;
+  categoryId?: string;
   ctaText?: string;
   ctaLink?: string;
   order?: number;
@@ -252,6 +292,7 @@ export interface CreateCategoryInput {
   isFeatured?: boolean;
   order?: number;
   isActive?: boolean;
+  billboards?: string[];
 }
 
 export interface UpdateCategoryInput {
@@ -263,6 +304,7 @@ export interface UpdateCategoryInput {
   isFeatured?: boolean;
   order?: number;
   isActive?: boolean;
+  billboards?: string[];
 }
 
 export interface PaginatedResponse<T> {
@@ -353,26 +395,26 @@ export interface PageSection {
   title?: string;
   order: number;
   isVisible: boolean;
-  
+
   // Billboard Section
   billboardId?: string;
-  
+
   // Featured Products Section
   productIds?: string[];
   productsLimit?: number;
   showFeaturedOnly?: boolean;
   categoryFilter?: string;
-  
+
   // Featured Categories Section
   categoryIds?: string[];
   categoriesLimit?: number;
-  
+
   // Text Content Section
   content?: string;
-  
+
   // Custom HTML Section
   html?: string;
-  
+
   // Layout options
   layout?: 'grid' | 'carousel' | 'list' | 'masonry';
   columns?: number;

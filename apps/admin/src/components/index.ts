@@ -19,3 +19,4 @@ export { StoreSwitcher } from './store-switcher';
 export { MediaUpload } from './media-upload';
 export { DataTable } from './data-table';
 export { Providers } from './providers';
+export { BillboardSelect } from './BillboardSelect';

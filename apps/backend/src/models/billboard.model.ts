@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import type { Billboard as BillboardType } from '@repo/types';
 
-export interface IBillboard extends Omit<BillboardType, '_id'>, Document {}
+export interface IBillboard extends Omit<BillboardType, '_id'>, Document { }
 
 const billboardSchema = new Schema<IBillboard>(
   {
@@ -9,6 +9,11 @@ const billboardSchema = new Schema<IBillboard>(
       type: String,
       required: true,
       index: true,
+    },
+    categoryId: {
+      type: String,
+      index: true,
+      default: null,
     },
     title: {
       type: String,

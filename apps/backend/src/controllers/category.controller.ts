@@ -149,3 +149,58 @@ export const deleteCategory = async (req: AuthRequest, res: Response, next: Next
   }
 };
 
+export const getCategoryBySlug = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { storeId, slug } = req.params;
+
+    const category = await Category.findOne({ storeId, slug, isActive: true })
+      .populate('billboards');
+    if (!category) {
+      throw new AppError('Category not found', 404);
+    }
+
+    // Filter out null billboards
+    if (category.billboards && Array.isArray(category.billboards)) {
+      category.billboards = category.billboards.filter(b => b);
+    }
+
+    res.json({ success: true, data: category });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getCategoryTree = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { storeId } = req.params;
+
+    const categories = await Category.find({
+      storeId,
+      isActive: true,
+    }).sort({ order: 1 });
+
+    const categoryMap = new Map();
+    const roots: any[] = [];
+
+    // Initialize map
+    categories.forEach((cat: any) => {
+      const category = cat.toObject();
+      categoryMap.set(cat._id.toString(), { ...category, children: [] });
+    });
+
+    // Build tree
+    categoryMap.forEach((cat: any) => {
+      if (cat.parentId && categoryMap.has(cat.parentId.toString())) {
+        const parent = categoryMap.get(cat.parentId.toString());
+        parent.children.push(cat);
+      } else {
+        roots.push(cat);
+      }
+    });
+
+    res.json({ success: true, data: roots });
+  } catch (error) {
+    next(error);
+  }
+};
+

@@ -8,7 +8,9 @@ const router = Router({ mergeParams: true });
 
 // Public routes
 router.get('/', categoryController.listCategories);
+router.get('/tree', categoryController.getCategoryTree);
 router.get('/featured', categoryController.getFeaturedCategories);
+router.get('/slug/:slug', categoryController.getCategoryBySlug);
 router.get('/:id', categoryController.getCategoryById);
 
 // Protected routes (admin/store_owner only)

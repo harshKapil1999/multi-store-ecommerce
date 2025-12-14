@@ -250,7 +250,7 @@ export function MediaUpload({
                         className="object-cover"
                       />
                     ) : (
-                      <video src={media.url} className="w-full h-full object-cover" />
+                      <video src={media.url} className="w-full h-full object-cover" controls />
                     )}
                     <button
                       onClick={() => removeMedia(media.key)}

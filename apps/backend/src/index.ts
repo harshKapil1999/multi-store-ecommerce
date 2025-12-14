@@ -29,8 +29,17 @@ console.log('🔐 JWT_SECRET loaded:', process.env.JWT_SECRET ? process.env.JWT_
 connectDB();
 
 // Middleware
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',').filter(Boolean);
 app.use(cors({
-  origin: process.env.ADMIN_URL || 'http://localhost:3001',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, false);
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -40,8 +49,8 @@ app.use(morgan('dev'));
 
 // Routes
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'E-commerce API Server', 
+  res.json({
+    message: 'E-commerce API Server',
     version: '1.0.0',
     endpoints: {
       health: '/health',

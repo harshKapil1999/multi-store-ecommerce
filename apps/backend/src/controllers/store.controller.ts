@@ -54,10 +54,16 @@ export const getStoreById = async (req: Request, res: Response, next: NextFuncti
 
 export const getStoreBySlug = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const store = await Store.findOne({ slug: req.params.slug, isActive: true });
+    const store = await Store.findOne({ slug: req.params.slug, isActive: true })
+      .populate('homeBillboards');
 
     if (!store) {
       throw new AppError('Store not found', 404);
+    }
+
+    // Filter out null billboards (in case referenced billboard was deleted)
+    if (store.homeBillboards && Array.isArray(store.homeBillboards)) {
+      store.homeBillboards = store.homeBillboards.filter(b => b);
     }
 
     res.json({ success: true, data: store });

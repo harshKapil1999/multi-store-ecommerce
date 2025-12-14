@@ -45,9 +45,7 @@ export default function NewPagePage() {
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
-    if (!slug) {
-      setSlug(generateSlug(value));
-    }
+    setSlug(generateSlug(value));
   };
 
   if (!selectedStoreId) {

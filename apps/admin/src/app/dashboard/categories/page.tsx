@@ -14,7 +14,10 @@ import {
 } from '@/components/index';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Category } from '@repo/types';
-import { Plus, Edit, Trash2, Star, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Trash2, Star, ExternalLink, FolderTree } from 'lucide-react';
+import { useStores } from '@/hooks/useStores';
+
+const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000';
 
 export function CategoriesPage() {
   const router = useRouter();
@@ -22,9 +25,15 @@ export function CategoriesPage() {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
   const { data, isLoading } = useCategories(selectedStoreId || '');
+  const { data: storesData } = useStores();
   const deleteMutation = useDeleteCategory(selectedStoreId || '', selectedCategory?._id || '');
 
   const categories = (data?.data || []) as Category[];
+  const stores = storesData?.data || [];
+  const currentStore = stores.find((s: any) => s._id === selectedStoreId);
+
+  // Create a map of category IDs to names for parent lookup
+  const categoryMap = new Map(categories.map(c => [c._id, c.name]));
 
   const columns: ColumnDef<Category>[] = [
     {
@@ -40,9 +49,30 @@ export function CategoriesPage() {
             />
           )}
           <div>
-            <p className="font-medium">{row.original.name}</p>
+            <div className="flex items-center gap-2">
+              {row.original.parentId && (
+                <span className="text-muted-foreground">↳</span>
+              )}
+              <p className="font-medium">{row.original.name}</p>
+            </div>
             <p className="text-sm text-muted-foreground">/{row.original.slug}</p>
           </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'parentId',
+      header: 'Parent Category',
+      cell: ({ row }) => (
+        <div>
+          {row.original.parentId ? (
+            <span className="text-sm flex items-center gap-1">
+              <FolderTree className="h-3 w-3" />
+              {categoryMap.get(row.original.parentId) || 'Unknown'}
+            </span>
+          ) : (
+            <span className="text-sm text-muted-foreground">— (Top Level)</span>
+          )}
         </div>
       ),
     },
@@ -84,10 +114,13 @@ export function CategoriesPage() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              const categoryUrl = `${window.location.origin}/stores/${selectedStoreId}/categories/${row.original.slug}`;
-              window.open(categoryUrl, '_blank', 'noopener,noreferrer');
+              if (currentStore?.slug) {
+                const categoryUrl = `${FRONTEND_URL}/${currentStore.slug}/category/${row.original.slug}`;
+                window.open(categoryUrl, '_blank', 'noopener,noreferrer');
+              }
             }}
-            title="View category"
+            title="View on frontend"
+            disabled={!currentStore?.slug}
           >
             <ExternalLink className="h-4 w-4" />
           </Button>
@@ -134,13 +167,23 @@ export function CategoriesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Categories</h1>
-          <p className="text-muted-foreground">Manage product categories</p>
+          <p className="text-muted-foreground">
+            Manage product categories. Use "Parent Category" to create subcategories.
+          </p>
         </div>
         <Button onClick={() => router.push('/dashboard/categories/new')}>
           <Plus className="mr-2 h-4 w-4" />
           New Category
         </Button>
       </div>
+
+      {/* Info Card about Category Hierarchy */}
+      <Card className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          <strong>Tip:</strong> Categories without a parent are "Top Level" categories shown in the main navigation.
+          To create a subcategory, select its parent when creating/editing.
+        </p>
+      </Card>
 
       <Card className="p-6">
         <DataTable<Category>

@@ -7,14 +7,20 @@ import { CreateBillboardInput, UpdateBillboardInput } from '../validators/billbo
 export const listBillboards = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { storeId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, categoryId } = req.query;
+
+    const filter: any = { storeId };
+    if (categoryId) {
+      // If 'null' string is passed, filter for null categoryId (general billboards)
+      filter.categoryId = categoryId === 'null' ? null : categoryId;
+    }
 
     const [billboards, total] = await Promise.all([
-      Billboard.find({ storeId })
+      Billboard.find(filter)
         .sort({ order: 1 })
         .limit(Number(limit))
         .skip((Number(page) - 1) * Number(limit)),
-      Billboard.countDocuments({ storeId }),
+      Billboard.countDocuments(filter),
     ]);
 
     res.json({
