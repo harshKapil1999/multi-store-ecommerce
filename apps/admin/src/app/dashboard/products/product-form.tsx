@@ -16,6 +16,11 @@ const attributeSchema = z.object({
   isFilterable: z.boolean().default(false),
 });
 
+const variantOptionSchema = z.object({
+  name: z.string().min(1, 'Option name is required'),
+  values: z.array(z.string().min(1)).min(1, 'At least one value is required'),
+});
+
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   slug: z.string().min(1, 'Slug is required'),
@@ -35,6 +40,8 @@ const productSchema = z.object({
   isFeatured: z.boolean().default(false),
   isActive: z.boolean().default(true),
   attributes: z.array(attributeSchema).default([]),
+  hasVariants: z.boolean().default(false),
+  variantOptions: z.array(variantOptionSchema).default([]),
 });
 
 interface ProductFormProps {
@@ -85,15 +92,19 @@ export function ProductForm({
           isFeatured: product.isFeatured,
           isActive: product.isActive,
           attributes: product.attributes || [],
+          hasVariants: product.hasVariants || false,
+          variantOptions: product.variantOptions || [],
         }
       : {
           isFeatured: false,
           isActive: true,
+          hasVariants: false,
           mrp: 0,
           sellingPrice: 0,
           stock: 0,
           mediaGallery: [],
           attributes: [],
+          variantOptions: [],
         },
   });
 
@@ -269,6 +280,130 @@ export function ProductForm({
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Variant Support Section */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold">Product Variants</h3>
+            <p className="text-sm text-muted-foreground">
+              Enable variants if this product has different sizes, colors, etc.
+            </p>
+          </div>
+          <Controller
+            name="hasVariants"
+            control={control}
+            render={({ field }) => (
+              <FormCheckbox
+                label="Has Variants"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+              />
+            )}
+          />
+        </div>
+
+        {watch('hasVariants') && (
+          <div className="space-y-6 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+                Variant Options
+              </h4>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentOptions = watch('variantOptions') || [];
+                  setValue('variantOptions', [...currentOptions, { name: '', values: [''] }]);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Option
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {watch('variantOptions')?.map((option: any, optIndex: number) => (
+                <div key={optIndex} className="p-4 border rounded-lg space-y-4 bg-muted/10">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1">
+                      <FormInput
+                        label="Option Name (e.g. Size, Color)"
+                        placeholder="Size"
+                        {...register(`variantOptions.${optIndex}.name`)}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="mt-8 text-red-500"
+                      onClick={() => {
+                        const current = [...watch('variantOptions')];
+                        current.splice(optIndex, 1);
+                        setValue('variantOptions', current);
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Option Values</label>
+                    <div className="flex flex-wrap gap-2">
+                      {option.values?.map((val: string, valIndex: number) => (
+                        <div key={valIndex} className="flex items-center gap-1 bg-white dark:bg-zinc-900 border rounded-full pl-3 pr-1 py-1">
+                          <input
+                            className="bg-transparent border-none outline-none text-xs w-20"
+                            value={val}
+                            onChange={(e) => {
+                              const current = [...watch('variantOptions')];
+                              current[optIndex].values[valIndex] = e.target.value;
+                              setValue('variantOptions', current);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="p-1 hover:bg-gray-100 rounded-full"
+                            onClick={() => {
+                              const current = [...watch('variantOptions')];
+                              current[optIndex].values.splice(valIndex, 1);
+                              setValue('variantOptions', current);
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full h-8 px-3 text-xs"
+                        onClick={() => {
+                          const current = [...watch('variantOptions')];
+                          current[optIndex].values.push('');
+                          setValue('variantOptions', current);
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Value
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {watch('variantOptions')?.length > 0 && (
+              <p className="text-xs text-amber-600 font-medium italic">
+                Note: Individual variants (price, SKU, stock) will be manageable after the product is created.
+              </p>
+            )}
           </div>
         )}
       </Card>

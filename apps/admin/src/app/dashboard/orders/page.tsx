@@ -58,8 +58,31 @@ export default function OrdersPage() {
     {
       accessorKey: 'total',
       header: 'Total',
+      cell: ({ row }) => {
+        const amount = row.original.total;
+        return (
+          <span className="font-semibold">
+            ₹{amount.toLocaleString('en-IN')}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'razorpayOrderId',
+      header: 'Razorpay ID',
       cell: ({ row }) => (
-        <span className="font-semibold">${row.original.total.toFixed(2)}</span>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {row.original.razorpayOrderId || '-'}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'transactionId',
+      header: 'Transaction ID',
+      cell: ({ row }) => (
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {row.original.transactionId || '-'}
+        </span>
       ),
     },
     {

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import type { Product as ProductType, Media, Attribute } from '@repo/types';
 
-export interface IProduct extends Omit<ProductType, '_id'>, Document {}
+export interface IProduct extends Omit<ProductType, '_id'>, Document { }
 
 const mediaSchema = new Schema<Media>(
   {
@@ -42,6 +42,20 @@ const attributeSchema = new Schema<Attribute>(
     isFilterable: {
       type: Boolean,
       default: false,
+    },
+  },
+  { _id: false }
+);
+
+const variantOptionSchema = new Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
+    values: {
+      type: [String],
+      required: true,
     },
   },
   { _id: false }
@@ -110,6 +124,14 @@ const productSchema = new Schema<IProduct>(
       required: true,
       min: 0,
       default: 0,
+    },
+    hasVariants: {
+      type: Boolean,
+      default: false,
+    },
+    variantOptions: {
+      type: [variantOptionSchema],
+      default: [],
     },
   },
   {

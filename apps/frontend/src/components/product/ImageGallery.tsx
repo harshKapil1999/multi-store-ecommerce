@@ -17,7 +17,7 @@ export function ImageGallery({ featuredImage, mediaGallery }: ImageGalleryProps)
   const [activeImage, setActiveImage] = useState(images[0]);
 
   return (
-    <div className="flex flex-col-reverse md:flex-row gap-4 sticky top-24">
+    <div className="flex flex-col-reverse md:flex-row gap-4 relative md:sticky md:top-24">
        {/* Thumbnails */}
        <div className="flex md:flex-col gap-4 overflow-x-auto md:overflow-y-auto md:w-20 md:h-[600px] scrollbar-hide">
           {images.map((img, idx) => (

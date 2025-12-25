@@ -4,9 +4,12 @@ import { useSelectedStore } from '@/contexts/store-context';
 import { useStores } from '@/hooks/useStores';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
+import { useOrders } from '@/hooks/useOrders';
+import { useTransactions } from '@/hooks/useTransactions';
 import { Card, Button } from '@/components/index';
 import Link from 'next/link';
 import { Package, Grid3x3, Image, ShoppingCart, Plus, AlertCircle, Loader2, ArrowUpRight, TrendingUp } from 'lucide-react';
+
 
 export default function Dashboard() {
   const { selectedStoreId } = useSelectedStore();
@@ -18,12 +21,25 @@ export default function Dashboard() {
   const { data: categories, isLoading: categoriesLoading, error: categoriesError } = useCategories(
     selectedStoreId || ''
   );
+  // Add Hooks via any to bypass type check if hooks not exported deeply or just use hooks if available
+  // Assuming hooks are available as per context
+  const { data: ordersData, isLoading: ordersLoading } = useOrders(selectedStoreId || undefined);
+  const { data: transactionsData, isLoading: transactionsLoading } = useTransactions(selectedStoreId || undefined);
 
   // Safely extract data with fallbacks
   const storeCount = stores?.pagination?.total || stores?.data?.length || 0;
   const productCount = products?.pagination?.total || products?.data?.length || 0;
   const categoryCount = categories?.pagination?.total || categories?.data?.length || 0;
   const productsList = Array.isArray(products?.data) ? products.data : [];
+  
+  // Orders and Transactions processing
+  const ordersList = Array.isArray(ordersData?.data) ? ordersData.data : (Array.isArray(ordersData) ? ordersData : []);
+  const transactionsList = Array.isArray(transactionsData) ? transactionsData : []; 
+
+  const orderCount = ordersList.length; // Approximate if not paginated fully, or use pagination total if available
+  const totalRevenue = transactionsList
+    .filter((t: any) => t.status === 'captured')
+    .reduce((acc: number, t: any) => acc + t.amount, 0) / 100;
 
   // Show error state if any critical data fetch fails
   if (storesError || (productsError && selectedStoreId) || (categoriesError && selectedStoreId)) {
@@ -107,12 +123,19 @@ export default function Dashboard() {
       icon: Package,
     },
     {
-      title: 'Categories',
-      value: categoryCount,
-      description: categoryCount === 0 ? 'No categories' : 'Organized Items',
-      loading: categoriesLoading && selectedStoreId,
-      icon: Grid3x3,
+      title: 'Orders',
+      value: orderCount,
+      description: 'Total orders',
+      loading: ordersLoading,
+      icon: ShoppingCart,
     },
+    {
+        title: 'Revenue',
+        value: `₹${totalRevenue.toLocaleString('en-IN')}`,
+        description: 'Total captured',
+        loading: transactionsLoading,
+        icon: ArrowUpRight,
+    }
   ];
 
   return (
@@ -132,6 +155,7 @@ export default function Dashboard() {
 
       {storeCount === 0 ? (
         <Card className="p-12 text-center border-dashed border-2 bg-gradient-to-b from-background to-muted/20">
+            {/* ... Empty State ... */}
           <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <Package className="h-8 w-8 text-primary" />
           </div>
@@ -148,6 +172,7 @@ export default function Dashboard() {
         </Card>
       ) : !selectedStoreId ? (
         <Card className="p-12 text-center border-2 border-dashed">
+            {/* ... No Store Selected ... */}
           <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
             <Package className="h-8 w-8 text-muted-foreground" />
           </div>
@@ -159,7 +184,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat) => {
               const Icon = stat.icon;
               return (
@@ -170,7 +195,7 @@ export default function Dashboard() {
                   <div className="relative z-10">
                     <p className="text-sm font-medium text-muted-foreground">{stat.title}</p>
                     <div className="flex items-baseline gap-2 mt-2">
-                      <p className="text-4xl font-bold tracking-tight">
+                      <p className="text-2xl font-bold tracking-tight">
                         {stat.loading ? (
                           <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         ) : (
@@ -215,15 +240,86 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Recent Orders */}
+            <Card className="overflow-hidden border-border/50 shadow-sm">
+                <div className="p-6 border-b border-border/50 flex items-center justify-between bg-muted/20">
+                    <div>
+                        <h2 className="text-lg font-bold">Recent Orders</h2>
+                        <p className="text-sm text-muted-foreground">Latest customer orders</p>
+                    </div>
+                    <Link href="/dashboard/orders">
+                        <Button variant="outline" size="sm">View All</Button>
+                    </Link>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-muted/10">
+                            <tr>
+                                <th className="px-4 py-3 text-left">Order #</th>
+                                <th className="px-4 py-3 text-left">Status</th>
+                                <th className="px-4 py-3 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {ordersList.slice(0, 5).map((order: any) => (
+                                <tr key={order._id} className="hover:bg-muted/30">
+                                    <td className="px-4 py-3 font-mono text-xs">{order._id.substring(0, 8)}...</td>
+                                    <td className="px-4 py-3 capitalize">{order.status}</td>
+                                    <td className="px-4 py-3 text-right">₹{order.totalAmount}</td>
+                                </tr>
+                            ))}
+                            {ordersList.length === 0 && (
+                                <tr>
+                                    <td colSpan={3} className="p-4 text-center text-muted-foreground">No orders yet</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+
+            {/* Recent Transactions */}
+            <Card className="overflow-hidden border-border/50 shadow-sm">
+                <div className="p-6 border-b border-border/50 flex items-center justify-between bg-muted/20">
+                    <div>
+                        <h2 className="text-lg font-bold">Recent Transactions</h2>
+                        <p className="text-sm text-muted-foreground">Latest payments</p>
+                    </div>
+                    <Link href="/dashboard/transactions">
+                        <Button variant="outline" size="sm">View All</Button>
+                    </Link>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead className="bg-muted/10">
+                            <tr>
+                                <th className="px-4 py-3 text-left">ID</th>
+                                <th className="px-4 py-3 text-left">Status</th>
+                                <th className="px-4 py-3 text-right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                            {transactionsList.slice(0, 5).map((t: any) => (
+                                <tr key={t._id} className="hover:bg-muted/30">
+                                    <td className="px-4 py-3 font-mono text-xs">{t.razorpayPaymentId?.substring(0, 10) || '-'}</td>
+                                    <td className="px-4 py-3 capitalize">{t.status}</td>
+                                    <td className="px-4 py-3 text-right">₹{(t.amount / 100).toLocaleString('en-IN')}</td>
+                                </tr>
+                            ))}
+                             {transactionsList.length === 0 && (
+                                <tr>
+                                    <td colSpan={3} className="p-4 text-center text-muted-foreground">No transactions yet</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+          </div>
+
           {/* Recent Products */}
           <div className="grid gap-6">
-            {productsLoading && (
-              <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary mb-2" />
-                <p className="text-muted-foreground">Loading products...</p>
-              </div>
-            )}
-            
             {!productsLoading && productsList.length > 0 && (
               <Card className="overflow-hidden border-border/50 shadow-sm">
                 <div className="p-6 border-b border-border/50 flex items-center justify-between bg-muted/20">
@@ -279,24 +375,6 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
-              </Card>
-            )}
-
-            {!productsLoading && productsList.length === 0 && (
-              <Card className="p-16 text-center border-dashed border-2 bg-muted/10">
-                <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Package className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h2 className="text-xl font-bold mb-2">No Products Yet</h2>
-                <p className="text-muted-foreground mb-8 text-sm max-w-sm mx-auto">
-                  Your store is empty. Start building your catalog by adding your first product.
-                </p>
-                <Link href="/dashboard/products">
-                  <Button className="rounded-full shadow-lg shadow-primary/20">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Product
-                  </Button>
-                </Link>
               </Card>
             )}
           </div>

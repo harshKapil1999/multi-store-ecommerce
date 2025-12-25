@@ -185,13 +185,13 @@ export const getCategoryTree = async (req: AuthRequest, res: Response, next: Nex
     // Initialize map
     categories.forEach((cat: any) => {
       const category = cat.toObject();
-      categoryMap.set(cat._id.toString(), { ...category, children: [] });
+      categoryMap.set(String(cat._id), { ...category, children: [] });
     });
 
     // Build tree
     categoryMap.forEach((cat: any) => {
-      if (cat.parentId && categoryMap.has(cat.parentId.toString())) {
-        const parent = categoryMap.get(cat.parentId.toString());
+      if (cat.parentId && categoryMap.has(String(cat.parentId))) {
+        const parent = categoryMap.get(String(cat.parentId));
         parent.children.push(cat);
       } else {
         roots.push(cat);

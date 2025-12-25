@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { Product } from '../models/product.model';
+import { Category } from '../models/category.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
 import {
@@ -24,7 +25,26 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
     } = req.query;
 
     const query: Record<string, any> = { storeId };
-    if (category) query.categoryId = category;
+
+    // specialized category handling for recursive lookup
+    if (category) {
+      // Fetch all categories to build the tree and find descendants
+      const allCategories = await Category.find({ storeId }).select('_id parentId').lean();
+
+      const getDescendants = (parentId: string): string[] => {
+        const children = allCategories.filter(c => String(c.parentId) === parentId);
+        let descendants: string[] = children.map(c => String(c._id));
+
+        for (const child of children) {
+          descendants = [...descendants, ...getDescendants(String(child._id))];
+        }
+        return descendants;
+      };
+
+      const categoryIds = [category as string, ...getDescendants(category as string)];
+      query.categoryId = { $in: categoryIds };
+    }
+
     if (search) query.$text = { $search: search as string };
     if (isFeatured === 'true') query.isFeatured = true;
 

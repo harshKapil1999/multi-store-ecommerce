@@ -11,7 +11,7 @@ export const getPages = async (req: Request, res: Response) => {
     const { published } = req.query;
 
     const query: any = { storeId };
-    
+
     if (published !== undefined) {
       query.isPublished = published === 'true';
     }
@@ -144,7 +144,7 @@ export const createPage = async (req: Request, res: Response) => {
         message: 'A page with this slug already exists for this store',
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Failed to create page',
@@ -186,7 +186,7 @@ export const updatePage = async (req: Request, res: Response) => {
         message: 'A page with this slug already exists for this store',
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Failed to update page',
@@ -275,7 +275,7 @@ export const addSection = async (req: Request, res: Response) => {
     }
 
     // Find the maximum order number
-    const maxOrder = page.sections.length > 0 
+    const maxOrder = page.sections.length > 0
       ? Math.max(...page.sections.map(s => s.order))
       : -1;
 
@@ -319,7 +319,7 @@ export const updateSection = async (req: Request, res: Response) => {
       });
     }
 
-    const sectionIndex = page.sections.findIndex(s => s._id.toString() === sectionId);
+    const sectionIndex = page.sections.findIndex(s => String(s._id) === sectionId);
 
     if (sectionIndex === -1) {
       return res.status(404).json({
@@ -366,7 +366,7 @@ export const deleteSection = async (req: Request, res: Response) => {
       });
     }
 
-    page.sections = page.sections.filter(s => s._id.toString() !== sectionId);
+    page.sections = page.sections.filter(s => String(s._id) !== sectionId);
 
     await page.save();
 
@@ -403,7 +403,7 @@ export const reorderSections = async (req: Request, res: Response) => {
 
     // Reorder sections based on sectionIds array
     const reorderedSections = sectionIds.map((id, index) => {
-      const section = page.sections.find(s => s._id.toString() === id);
+      const section = page.sections.find(s => String(s._id) === id);
       if (section) {
         section.order = index;
         return section;

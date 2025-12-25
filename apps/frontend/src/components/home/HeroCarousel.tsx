@@ -7,9 +7,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HeroCarouselProps {
   billboards: Billboard[];
+  storeSlug?: string;
 }
 
-export function HeroCarousel({ billboards }: HeroCarouselProps) {
+export function HeroCarousel({ billboards, storeSlug }: HeroCarouselProps) {
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
@@ -26,6 +27,17 @@ export function HeroCarousel({ billboards }: HeroCarouselProps) {
 
   const nextSlide = () => {
     setCurrent((prev) => (prev + 1) % billboards.length);
+  };
+
+  // Helper function to build CTA link with store slug prepended
+  const buildCtaLink = (ctaLink?: string): string => {
+    if (!ctaLink) return '#';
+    // If it already starts with /, prepend store slug
+    if (ctaLink.startsWith('/')) {
+      return storeSlug ? `/${storeSlug}${ctaLink}` : ctaLink;
+    }
+    // If it's a full URL, use as-is
+    return ctaLink;
   };
 
   if (!billboards || billboards.length === 0) return null;
@@ -66,7 +78,7 @@ export function HeroCarousel({ billboards }: HeroCarouselProps) {
                 </h1>
                 {billboard.ctaText && (
                   <Link
-                    href={billboard.ctaLink || '#'}
+                    href={buildCtaLink(billboard.ctaLink)}
                     className="inline-block bg-white text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-200 transition-transform hover:scale-105"
                   >
                     {billboard.ctaText}

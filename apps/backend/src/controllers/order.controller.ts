@@ -116,7 +116,7 @@ export const createOrder = async (req: AuthRequest, res: Response, next: NextFun
       subtotal += itemTotal;
 
       orderItems.push({
-        productId: product._id,
+        productId: String(product._id),
         name: product.name,
         quantity: item.quantity,
         price: product.sellingPrice,

@@ -94,7 +94,7 @@ export default function LandingPage() {
               </Button>
             </Link>
             <a
-              href="https://github.com"
+              href="https://github.com/harshKapil1999/multi-store-ecommerce.git"
               target="_blank"
               rel="noopener noreferrer"
               className="h-14 px-8 inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 text-base font-medium text-white backdrop-blur-sm transition-all hover:bg-white/10"

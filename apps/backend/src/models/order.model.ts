@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import type { Order as OrderType } from '@repo/types';
 
-export interface IOrder extends Omit<OrderType, '_id'>, Document {}
+export interface IOrder extends Omit<OrderType, '_id'>, Document { }
 
 const orderSchema = new Schema<IOrder>(
   {
@@ -67,6 +67,10 @@ const orderSchema = new Schema<IOrder>(
       type: Number,
       default: 0,
     },
+    discount: {
+      type: Number,
+      default: 0,
+    },
     total: {
       type: Number,
       required: true,
@@ -84,6 +88,14 @@ const orderSchema = new Schema<IOrder>(
       index: true,
     },
     paymentMethod: String,
+    transactionId: {
+      type: String,
+      index: true,
+    },
+    razorpayOrderId: {
+      type: String,
+      index: true,
+    },
     shippingAddress: {
       firstName: String,
       lastName: String,

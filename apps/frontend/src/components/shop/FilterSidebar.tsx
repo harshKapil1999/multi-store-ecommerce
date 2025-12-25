@@ -45,6 +45,42 @@ export function FilterSidebar({
     });
   };
 
+  // Recursive function to render category tree
+  const renderCategoryTree = (cats: CategoryWithChildren[], depth = 0): JSX.Element => {
+    return (
+      <ul className={`space-y-2 ${depth > 0 ? 'ml-4 border-l border-gray-100 dark:border-white/10 pl-4' : ''}`}>
+        {cats.map((category) => (
+          <li key={category._id}>
+            <div className="flex items-center justify-between">
+              <Link 
+                href={`/${storeSlug}/category/${category.slug}`}
+                className={`text-sm hover:text-black dark:hover:text-white transition-colors flex-1 ${
+                  activeCategoryId === category._id || activeCategoryId === category.slug 
+                    ? 'font-bold text-black dark:text-white' 
+                    : 'text-gray-500'
+                }`}
+              >
+                {category.name}
+              </Link>
+              {category.children && category.children.length > 0 && (
+                <button
+                  onClick={() => toggleSection(`cat-${category._id}`)}
+                  className="ml-2 flex-shrink-0"
+                >
+                  {openSections[`cat-${category._id}`] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              )}
+            </div>
+            {/* Nested children */}
+            {category.children && category.children.length > 0 && openSections[`cat-${category._id}`] && (
+              renderCategoryTree(category.children, depth + 1)
+            )}
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   const priceRanges = [
     { label: 'Under ₹2,500', min: 0, max: 2500 },
     { label: '₹2,500 - ₹5,000', min: 2500, max: 5000 },
@@ -66,37 +102,7 @@ export function FilterSidebar({
           </button>
           
           {openSections.categories && (
-            <ul className="space-y-3">
-              {categories.map((category) => (
-                <li key={category._id}>
-                   <Link 
-                     href={`/${storeSlug}/category/${category.slug}`}
-                     className={`text-sm hover:text-black dark:hover:text-white transition-colors ${
-                       activeCategoryId === category._id || activeCategoryId === category.slug 
-                         ? 'font-bold text-black dark:text-white' 
-                         : 'text-gray-500'
-                     }`}
-                   >
-                     {category.name}
-                   </Link>
-                   {/* Subcategories */}
-                   {category.children && category.children.length > 0 && (
-                      <ul className="ml-4 mt-2 space-y-2 border-l border-gray-100 dark:border-white/10 pl-4">
-                        {category.children.map(child => (
-                           <li key={child._id}>
-                              <Link 
-                                href={`/${storeSlug}/category/${child.slug}`}
-                                className="text-xs text-gray-500 hover:text-black dark:hover:text-white transition-colors"
-                              >
-                                {child.name}
-                              </Link>
-                           </li>
-                        ))}
-                      </ul>
-                   )}
-                </li>
-              ))}
-            </ul>
+            renderCategoryTree(categories)
           )}
        </div>
 

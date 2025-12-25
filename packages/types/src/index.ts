@@ -24,6 +24,7 @@ export interface Store {
   theme?: StoreTheme;
   navigation?: NavItem[];
   footer?: FooterConfig;
+  topBar?: TopBarConfig;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -63,6 +64,15 @@ export interface FooterConfig {
   sections: FooterSection[];
   copyright: string;
   bottomLinks: NavLink[];
+}
+
+export interface TopBarConfig {
+  isVisible: boolean;
+  logo?: string; // Cloudflare R2 URL
+  text?: string; // Alternative to logo
+  message?: string; // Promotional message
+  links: NavLink[]; // e.g., Find a Store, Help
+  backgroundColor?: string;
 }
 
 // Billboard Types
@@ -113,18 +123,48 @@ export interface Product {
   isFeatured: boolean;
   isActive: boolean;
   stock: number;
+  hasVariants: boolean; // Whether product has variants
+  variantOptions?: VariantOption[]; // Defines available variant types
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Variant Types
+export interface VariantOption {
+  name: string; // e.g., "Size", "Color", "Material"
+  values: string[]; // e.g., ["S", "M", "L", "XL"] or ["Red", "Blue", "Green"]
 }
 
 export interface ProductVariant {
   _id: string;
   productId: string;
+  name: string; // e.g., "Red - Size M"
+  sku: string;
+  price: number;
+  stock: number;
+  attributes: Record<string, string>; // e.g., { size: 'M', color: 'Red' }
+  images?: string[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateVariantInput {
   name: string;
   sku: string;
   price: number;
-  inventory: number;
-  attributes: Record<string, string>; // e.g., { size: 'M', color: 'Blue' }
+  stock: number;
+  attributes: Record<string, string>;
+  isActive?: boolean;
+}
+
+export interface UpdateVariantInput {
+  name?: string;
+  sku?: string;
+  price?: number;
+  stock?: number;
+  attributes?: Record<string, string>;
+  isActive?: boolean;
 }
 
 // Category Types
@@ -158,10 +198,13 @@ export interface Order {
   subtotal: number;
   tax: number;
   shipping: number;
+  discount: number; // Promo code discount
   total: number;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   paymentMethod?: string;
+  transactionId?: string; // Reference to Transaction
+  razorpayOrderId?: string;
   shippingAddress: Address;
   billingAddress: Address;
   notes?: string;
@@ -216,11 +259,58 @@ export interface CartItem {
   variantId?: string;
   quantity: number;
   product?: Product;
+  variant?: ProductVariant;
+  selectedAttributes?: Record<string, string>; // For display purposes
 }
 
 export interface Cart {
   items: CartItem[];
+  subtotal: number;
   total: number;
+}
+
+// Transaction Types  
+export interface Transaction {
+  _id: string;
+  orderId: string;
+  storeId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId?: string;
+  razorpaySignature?: string;
+  amount: number;
+  currency: string;
+  status: 'created' | 'authorized' | 'captured' | 'failed' | 'refunded';
+  method?: string; // card, netbanking, upi, etc.
+  email?: string;
+  phone?: string;
+  notes?: Record<string, string>;
+  errorCode?: string;
+  errorDescription?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateTransactionInput {
+  orderId: string;
+  storeId: string;
+  amount: number;
+  currency?: string;
+  notes?: Record<string, string>;
+}
+
+export interface RazorpayOrderResponse {
+  id: string;
+  entity: string;
+  amount: number;
+  currency: string;
+  receipt?: string;
+  status: string;
+}
+
+export interface VerifyPaymentInput {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
 }
 
 // API Response Types
@@ -347,6 +437,8 @@ export interface CreateProductInput {
   isFeatured?: boolean;
   isActive?: boolean;
   stock?: number;
+  hasVariants?: boolean;
+  variantOptions?: VariantOption[];
 }
 
 export interface UpdateProductInput {
@@ -362,6 +454,8 @@ export interface UpdateProductInput {
   isFeatured?: boolean;
   isActive?: boolean;
   stock?: number;
+  hasVariants?: boolean;
+  variantOptions?: VariantOption[];
 }
 
 export interface UpdateStockInput {

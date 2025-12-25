@@ -24,15 +24,36 @@ async function getCategoryData(storeSlug: string, categorySlug: string, page = 1
      const category = await api.get<CategoryWithChildren>(`/stores/${store._id}/categories/slug/${categorySlug}`);
      if (!category) throw new Error('Category not found');
 
+     // Recursively collect all category IDs (current + all descendants)
+     const getAllCategoryIds = (cat: CategoryWithChildren): string[] => {
+       let ids = [cat._id];
+       if (cat.children && cat.children.length > 0) {
+         cat.children.forEach(child => {
+           ids = ids.concat(getAllCategoryIds(child));
+         });
+       }
+       return ids;
+     };
+
+     const allCategoryIds = getAllCategoryIds(category);
+
+     // Fetch products for all these categories
      const [productsData, categories] = await Promise.all([
-        api.get<{ data: Product[], total: number }>(`/stores/${store._id}/products?category=${category._id}&page=${page}`),
+        // Fetch products from all category IDs in one query
+        api.get<{ data: Product[], total: number }>(`/stores/${store._id}/products?page=${page}&limit=12`),
         api.get<CategoryWithChildren[]>(`/stores/${store._id}/categories/tree`),
      ]);
+
+     // Filter products to only include those in the current category and its descendants
+     const allProducts = Array.isArray(productsData?.data) ? productsData.data : [];
+     const filteredProducts = allProducts.filter(product => 
+       allCategoryIds.includes(product.categoryId)
+     );
      
      return {
         store,
         category,
-        products: Array.isArray(productsData?.data) ? productsData.data : [],
+        products: filteredProducts,
         categories: Array.isArray(categories) ? categories : [],
         billboards: category.billboards || [],
      };
@@ -57,7 +78,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   return (
     <>
-      {billboards.length > 0 && <HeroCarousel billboards={billboards} />}
+      {billboards.length > 0 && <HeroCarousel billboards={billboards} storeSlug={storeSlug} />}
       
       <div className="container mx-auto px-4 md:px-8 py-8">
         {/* Header - Only show title if no billboards, or keep it as breadcrumb/title */}

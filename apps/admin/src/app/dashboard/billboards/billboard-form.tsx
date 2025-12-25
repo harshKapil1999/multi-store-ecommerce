@@ -89,7 +89,8 @@ export function BillboardForm({ billboard, onSubmit, isLoading = false }: Billbo
 
             <FormInput
               label="CTA Link (Optional)"
-              placeholder="https://example.com/collection"
+              placeholder="/men or /running-shoes"
+              helperText="The store slug will be added automatically. Example: /men becomes /{store-slug}/men"
               error={errors.ctaLink?.message as string | undefined}
               {...register('ctaLink')}
             />

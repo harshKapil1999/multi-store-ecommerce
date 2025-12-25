@@ -22,8 +22,8 @@ export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploa
       mimeType: isVideo ? 'video/mp4' : 'image/jpeg',
       order: mediaGallery.length,
     };
+    // Add new media without clearing isAdding so user can add more files
     onUpdate([...mediaGallery, newMedia]);
-    setIsAdding(false);
   };
 
   const handleRemove = (index: number) => {
@@ -40,7 +40,11 @@ export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploa
             <div key={index} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
               {media.type === 'video' ? (
                 <div className="w-full h-full flex items-center justify-center bg-black">
-                  <Video className="w-8 h-8 text-white" />
+                  <video 
+                    src={media.url} 
+                    className="w-full h-full object-cover"
+                    controls
+                  />
                 </div>
               ) : (
                 <img
@@ -64,14 +68,14 @@ export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploa
       {/* Add New Media */}
       {isAdding ? (
         <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-          <p className="text-sm font-medium">Upload Image or Video</p>
+          <p className="text-sm font-medium">Upload Image or Video (You can add multiple files)</p>
           <MediaUpload
             onMediaUploaded={handleAddMedia}
             accept="image/*,video/*"
             maxSize={100}
           />
           <Button type="button" variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-            Cancel
+            Done Adding
           </Button>
         </div>
       ) : (

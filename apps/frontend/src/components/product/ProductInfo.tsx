@@ -1,38 +1,32 @@
 "use client";
 
-import { Product, Category } from '@repo/types';
+import { Product, Category, ProductVariant } from '@repo/types';
 import { useState } from 'react';
-import { Heart, ChevronDown, ChevronUp, Truck, RotateCcw, Info } from 'lucide-react';
+import { Heart, ChevronDown, ChevronUp, Truck, RotateCcw } from 'lucide-react';
+import { VariantSelector } from './VariantSelector';
+import { AddToBagButton } from './AddToBagButton';
 
 interface ProductInfoProps {
   product: Product;
+  variants?: ProductVariant[];
   categoryName?: string;
+  selectedVariant: ProductVariant | null;
+  onVariantSelect: (variant: ProductVariant | null) => void;
 }
 
-export function ProductInfo({ product, categoryName }: ProductInfoProps) {
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
+export function ProductInfo({ 
+  product, 
+  variants = [], 
+  categoryName, 
+  selectedVariant, 
+  onVariantSelect 
+}: ProductInfoProps) {
+  // const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null); // Lifted up
   const [openSections, setOpenSections] = useState({
     delivery: false,
     reviews: false,
     info: false,
   });
-
-  // Extract size options from product attributes
-  const sizeAttribute = product.attributes?.find(
-    attr => attr.name.toLowerCase() === 'size'
-  );
-  const sizes = sizeAttribute ? [sizeAttribute.value] : ['UK 6', 'UK 7', 'UK 8', 'UK 9', 'UK 10', 'UK 11', 'UK 12'];
-  
-  // If there are multiple size attributes, collect them all
-  const allSizeValues = product.attributes
-    ?.filter(attr => attr.name.toLowerCase() === 'size')
-    .map(attr => attr.value) || [];
-  const displaySizes = allSizeValues.length > 0 ? allSizeValues : sizes;
-
-  // Get color from attributes
-  const colorAttribute = product.attributes?.find(
-    attr => attr.name.toLowerCase() === 'color' || attr.name.toLowerCase() === 'colour'
-  );
 
   const toggleSection = (section: keyof typeof openSections) => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -49,11 +43,13 @@ export function ProductInfo({ product, categoryName }: ProductInfoProps) {
            <p className="text-gray-500 text-sm mb-3">{categoryName}</p>
          )}
          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-xl font-semibold">MRP : ₹{product.sellingPrice.toLocaleString()}</span>
-            {product.sellingPrice < product.mrp && (
+            <span className="text-xl font-semibold">
+              MRP : ₹{(selectedVariant?.price || product.sellingPrice).toLocaleString()}
+            </span>
+            {product.sellingPrice < product.mrp && !selectedVariant && (
                <span className="text-gray-400 line-through text-sm">₹{product.mrp.toLocaleString()}</span>
             )}
-            {product.sellingPrice < product.mrp && (
+            {product.sellingPrice < product.mrp && !selectedVariant && (
                <span className="text-green-600 dark:text-green-400 font-medium text-sm bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">
                   {Math.round(((product.mrp - product.sellingPrice) / product.mrp) * 100)}% off
                </span>
@@ -62,37 +58,42 @@ export function ProductInfo({ product, categoryName }: ProductInfoProps) {
          <p className="text-xs text-gray-400 mt-1">Inclusive of all taxes</p>
       </div>
 
-      {/* Size Selector */}
-      <div>
-         <div className="flex justify-between items-center mb-4">
-            <span className="font-medium text-gray-900 dark:text-white">Select Size</span>
-            <button className="text-sm text-gray-500 underline flex items-center gap-1">
-              <Info size={14} />
-              Size Guide
-            </button>
-         </div>
-         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {displaySizes.map((size, idx) => (
-               <button
-                  key={idx}
-                  onClick={() => setSelectedSize(size)}
-                  className={`py-3 px-4 rounded-md border text-sm font-medium transition-all ${
-                     selectedSize === size 
-                       ? 'border-black bg-black text-white dark:border-white dark:bg-white dark:text-black' 
-                       : 'border-gray-200 hover:border-black dark:border-zinc-700 dark:hover:border-white'
-                  }`}
-               >
-                  {size}
-               </button>
-            ))}
-         </div>
-      </div>
+      {/* Variant Selector */}
+      {product.hasVariants && (
+        <VariantSelector 
+          product={product} 
+          variants={variants} 
+          onVariantSelect={onVariantSelect} 
+        />
+      )}
+
+      {/* Basic Attribute Selector (Legacy fallback if no dynamic variants) */}
+      {!product.hasVariants && product.attributes?.some(a => a.name.toLowerCase() === 'size') && (
+        <div>
+           <div className="flex justify-between items-center mb-4">
+              <span className="font-medium text-gray-900 dark:text-white">Select Size</span>
+           </div>
+           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {product.attributes
+                .filter(a => a.name.toLowerCase() === 'size')
+                .map((attr, idx) => (
+                 <button
+                    key={idx}
+                    className="py-3 px-4 rounded-md border border-black bg-black text-white dark:border-white dark:bg-white dark:text-black text-sm font-medium"
+                 >
+                    {attr.value}
+                 </button>
+              ))}
+           </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="space-y-3 pt-2">
-         <button className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-full font-bold hover:opacity-90 transition-opacity">
-            Add to Bag
-         </button>
+         <AddToBagButton 
+            product={product} 
+            selectedVariant={selectedVariant} 
+         />
          <button className="w-full border border-gray-300 dark:border-zinc-700 py-4 rounded-full font-bold flex items-center justify-center gap-2 hover:border-black dark:hover:border-white transition-colors">
             Favourite <Heart size={18} />
          </button>
@@ -100,14 +101,16 @@ export function ProductInfo({ product, categoryName }: ProductInfoProps) {
 
       {/* Description */}
       <div className="pt-6 border-t border-gray-200 dark:border-white/10">
-         <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm">
+         <p className="text-gray-600 dark:text-gray-300 leading-relaxed text-sm whitespace-pre-wrap">
             {product.description}
          </p>
          <ul className="mt-4 space-y-1 text-sm text-gray-500">
-            {colorAttribute && (
-              <li>• Colour Shown: {colorAttribute.value}</li>
+            {selectedVariant?.sku && (
+              <li>• Style: {selectedVariant.sku}</li>
             )}
-            <li>• Style: {product.slug.toUpperCase().slice(0, 10)}</li>
+            {!selectedVariant?.sku && (
+              <li>• Style: {product.slug.toUpperCase().slice(0, 10)}</li>
+            )}
          </ul>
       </div>
 

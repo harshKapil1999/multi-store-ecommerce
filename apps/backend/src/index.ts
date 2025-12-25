@@ -16,6 +16,9 @@ import orderRoutes from './routes/order.routes';
 import userRoutes from './routes/user.routes';
 import uploadRoutes from './routes/upload.routes';
 import pageRoutes from './routes/page.routes';
+import variantRoutes from './routes/variant.routes';
+import transactionRoutes from './routes/transaction.routes';
+import paymentRoutes from './routes/payment.routes';
 
 dotenv.config();
 
@@ -83,6 +86,15 @@ app.use('/api/v1/stores/:storeId/pages', validateStoreContext, pageRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/media', uploadRoutes);
+
+// Variant routes (public and admin)
+app.use('/api/v1', variantRoutes);
+
+// Transaction routes (admin)
+app.use('/api/v1/transactions', transactionRoutes);
+
+// Payment routes
+app.use('/api/v1/payment', paymentRoutes);
 
 // Error handling
 app.use(errorHandler);

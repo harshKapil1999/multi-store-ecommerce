@@ -52,7 +52,7 @@ export default async function StorePage({ params }: PageProps) {
 
   return (
     <>
-      <HeroCarousel billboards={billboards} />
+      <HeroCarousel billboards={billboards} storeSlug={storeSlug} />
       
       <div className="space-y-12 pb-20">
         <FeaturedCategories categories={categories} storeSlug={storeSlug} />

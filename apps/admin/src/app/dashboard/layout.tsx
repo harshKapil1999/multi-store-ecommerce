@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { StoreSwitcher, Button } from '@/components/index';
-import { Menu, X, Home, Package, Grid3x3, Image, ShoppingCart, LogOut, Loader2, FileText, Moon, Sun, User, Settings } from 'lucide-react';
+import { Menu, X, Home, Package, Grid3x3, Image, ShoppingCart, LogOut, Loader2, FileText, Moon, Sun, User, Settings, CreditCard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/theme-context';
 import { logoutAction } from '@/lib/actions/auth';
@@ -20,6 +20,7 @@ export default function DashboardLayout({
   const { user, setUser, isLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
   const [sessionChecked, setSessionChecked] = useState(false);
 
   // Fetch session on mount
@@ -72,11 +73,12 @@ export default function DashboardLayout({
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'Stores', href: '/dashboard/stores', icon: Package },
-    { name: 'Pages', href: '/dashboard/pages', icon: FileText },
     { name: 'Billboards', href: '/dashboard/billboards', icon: Image },
     { name: 'Categories', href: '/dashboard/categories', icon: Grid3x3 },
     { name: 'Products', href: '/dashboard/products', icon: Package },
     { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
+    { name: 'Transactions', href: '/dashboard/transactions', icon: CreditCard },
+    { name: 'Pages', href: '/dashboard/pages', icon: FileText },
   ];
 
   return (
@@ -100,13 +102,21 @@ export default function DashboardLayout({
         <nav className="flex-1 space-y-2 px-3">
           {navigation.map((item) => {
             const Icon = item.icon;
+            const isActive = item.href === '/dashboard' 
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.href);
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted transition-colors"
+                className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+                  isActive 
+                    ? 'bg-slate-200 dark:bg-slate-800 font-medium text-black dark:text-white' 
+                    : 'hover:bg-muted text-muted-foreground'
+                }`}
               >
-                <Icon className="h-5 w-5 flex-shrink-0" />
+                <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-black dark:text-white' : ''}`} />
                 {sidebarOpen && <span className="text-sm">{item.name}</span>}
               </Link>
             );

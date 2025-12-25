@@ -56,6 +56,14 @@ const storeSchema = new Schema<IStore>(
       copyright: String,
       bottomLinks: [{ label: String, href: String }]
     },
+    topBar: {
+      isVisible: { type: Boolean, default: false },
+      logo: String,
+      text: String,
+      message: String,
+      links: [{ label: String, href: String, categoryId: String }],
+      backgroundColor: String,
+    },
     isActive: {
       type: Boolean,
       default: true,

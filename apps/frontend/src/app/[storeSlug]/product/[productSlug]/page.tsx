@@ -1,8 +1,7 @@
 import { api } from '@/lib/api';
-import { ImageGallery } from '@/components/product/ImageGallery';
-import { ProductInfo } from '@/components/product/ProductInfo';
 import { RelatedProducts } from '@/components/product/RelatedProducts';
-import { Store, Product, Category } from '@repo/types';
+import { ProductView } from '@/components/product/ProductView';
+import { Store, Product, Category, ProductVariant } from '@repo/types';
 
 interface ProductPageProps {
   params: Promise<{
@@ -33,9 +32,23 @@ async function getProductData(storeSlug: string, productSlug: string) {
      // Fetch related products (e.g., same category)
      const relatedResponse = await api.get<{ data: Product[]; total: number; page: number; limit: number; totalPages: number }>(`/stores/${store._id}/products?category=${product.categoryId}&limit=10`);
 
+     // Fetch variants if product has them
+     let variants: ProductVariant[] = [];
+     if (product.hasVariants) {
+       try {
+         const variantsResponse = await api.get<ProductVariant[]>(`/products/${product._id}/variants`);
+         if (Array.isArray(variantsResponse)) {
+           variants = variantsResponse;
+         }
+       } catch (error) {
+         console.error('Error fetching variants:', error);
+       }
+     }
+
      return {
         store,
         product,
+        variants,
         categoryName,
         relatedProducts: (Array.isArray(relatedResponse?.data) ? relatedResponse.data : []).filter(p => p._id !== product._id),
      };
@@ -54,17 +67,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
     return <div className="p-20 text-center">Product not found</div>;
   }
 
-  const { product, categoryName, relatedProducts } = data;
+   const { product, variants, categoryName, relatedProducts } = data;
 
   return (
     <div className="container mx-auto px-4 md:px-8 py-8 md:py-12">
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">
-          <ImageGallery 
-            featuredImage={product.featuredImage} 
-            mediaGallery={product.mediaGallery} 
-          />
-          <ProductInfo product={product} categoryName={categoryName} />
-       </div>
+       <ProductView 
+         product={product} 
+         variants={variants} 
+         categoryName={categoryName} 
+       />
        
        <RelatedProducts products={relatedProducts} />
     </div>
