@@ -1,8 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProductVariant } from '../models/variant.model';
 import { Product } from '../models/product.model';
+import { Store } from '../models/store.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
+
+async function assertCanManageProductVariants(req: AuthRequest, product: any) {
+    if (req.user?.role === 'admin') {
+        return;
+    }
+
+    const store = await Store.findOne({ _id: product.storeId, owner: req.user?.id }).select('_id').lean();
+    if (!store) {
+        throw new AppError('Not authorized to manage variants for this product', 403);
+    }
+}
 
 export const getVariantsByProduct = async (
     req: Request,
@@ -13,7 +25,7 @@ export const getVariantsByProduct = async (
         const { productId } = req.params;
 
         const product = await Product.findById(productId);
-        if (!product) {
+        if (!product || !product.isActive) {
             throw new AppError('Product not found', 404);
         }
 
@@ -50,13 +62,14 @@ export const createVariant = async (
 ) => {
     try {
         const { productId } = req.params;
-        const { name, sku, price, stock, attributes, isActive } = req.body;
+        const { name, sku, price, compareAtPrice, stock, attributes, images, featuredImageIndex, isActive } = req.body;
 
         // Verify product exists
         const product = await Product.findById(productId);
         if (!product) {
             throw new AppError('Product not found', 404);
         }
+        await assertCanManageProductVariants(req, product);
 
         // Check if product has variants enabled
         if (!product.hasVariants) {
@@ -74,8 +87,11 @@ export const createVariant = async (
             name,
             sku,
             price,
+            compareAtPrice,
             stock,
             attributes,
+            images: images || [],
+            featuredImageIndex: featuredImageIndex || 0,
             isActive: isActive !== undefined ? isActive : true,
         });
 
@@ -91,12 +107,18 @@ export const updateVariant = async (
     next: NextFunction
 ) => {
     try {
-        const { name, sku, price, stock, attributes, isActive } = req.body;
+        const { name, sku, price, compareAtPrice, stock, attributes, images, featuredImageIndex, isActive } = req.body;
 
         const variant = await ProductVariant.findById(req.params.id);
         if (!variant) {
             throw new AppError('Variant not found', 404);
         }
+
+        const product = await Product.findById(variant.productId);
+        if (!product) {
+            throw new AppError('Product not found for this variant', 404);
+        }
+        await assertCanManageProductVariants(req, product);
 
         // Check if new SKU conflicts with existing
         if (sku && sku !== variant.sku) {
@@ -109,8 +131,11 @@ export const updateVariant = async (
         if (name !== undefined) variant.name = name;
         if (sku !== undefined) variant.sku = sku;
         if (price !== undefined) variant.price = price;
+        if (compareAtPrice !== undefined) variant.compareAtPrice = compareAtPrice;
         if (stock !== undefined) variant.stock = stock;
         if (attributes !== undefined) variant.attributes = attributes;
+        if (images !== undefined) variant.images = images;
+        if (featuredImageIndex !== undefined) variant.featuredImageIndex = featuredImageIndex;
         if (isActive !== undefined) variant.isActive = isActive;
 
         await variant.save();
@@ -127,11 +152,18 @@ export const deleteVariant = async (
     next: NextFunction
 ) => {
     try {
-        const variant = await ProductVariant.findByIdAndDelete(req.params.id);
-
+        const variant = await ProductVariant.findById(req.params.id);
         if (!variant) {
             throw new AppError('Variant not found', 404);
         }
+
+        const product = await Product.findById(variant.productId);
+        if (!product) {
+            throw new AppError('Product not found for this variant', 404);
+        }
+        await assertCanManageProductVariants(req, product);
+
+        await variant.deleteOne();
 
         res.json({ success: true, message: 'Variant deleted successfully' });
     } catch (error) {
@@ -155,6 +187,12 @@ export const updateVariantStock = async (
         if (!variant) {
             throw new AppError('Variant not found', 404);
         }
+
+        const product = await Product.findById(variant.productId);
+        if (!product) {
+            throw new AppError('Product not found for this variant', 404);
+        }
+        await assertCanManageProductVariants(req, product);
 
         variant.stock = stock;
         await variant.save();
@@ -183,6 +221,7 @@ export const bulkCreateVariants = async (
         if (!product) {
             throw new AppError('Product not found', 404);
         }
+        await assertCanManageProductVariants(req, product);
 
         if (!product.hasVariants) {
             throw new AppError('Product does not support variants', 400);
@@ -190,6 +229,10 @@ export const bulkCreateVariants = async (
 
         // Check for duplicate SKUs
         const skus = variants.map((v: any) => v.sku);
+        if (new Set(skus).size !== skus.length) {
+            throw new AppError('Duplicate SKUs are not allowed in the same request', 400);
+        }
+
         const existingSkus = await ProductVariant.find({ sku: { $in: skus } });
         if (existingSkus.length > 0) {
             throw new AppError('One or more SKUs already exist', 400);
@@ -199,6 +242,9 @@ export const bulkCreateVariants = async (
             variants.map((v: any) => ({
                 ...v,
                 productId,
+                images: v.images || [],
+                featuredImageIndex: v.featuredImageIndex || 0,
+                compareAtPrice: v.compareAtPrice,
             }))
         );
 

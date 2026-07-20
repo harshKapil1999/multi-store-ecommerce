@@ -3,20 +3,37 @@ import { Store } from '../models/store.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
 import { CreateStoreInput, UpdateStoreInput, ToggleStoreInput } from '../validators/store.schema';
+import { Category } from '../models/category.model';
+import { Product } from '../models/product.model';
+
+const validateHomeSectionResources = async (storeId: string, sections: CreateStoreInput['homeSections']) => {
+  if (!sections) return;
+
+  const categoryIds = [...new Set(sections.flatMap((section) => section.categoryIds || []))];
+  const productIds = [...new Set(sections.flatMap((section) => section.productIds || []))];
+  const [categoryCount, productCount] = await Promise.all([
+    categoryIds.length ? Category.countDocuments({ _id: { $in: categoryIds }, storeId }) : 0,
+    productIds.length ? Product.countDocuments({ _id: { $in: productIds }, storeId }) : 0,
+  ]);
+
+  if (categoryCount !== categoryIds.length || productCount !== productIds.length) {
+    throw new AppError('Home page selections must belong to this store', 400);
+  }
+};
 
 export const getAllStores = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
     const search = req.query.search as string | undefined;
-    const query: Record<string, any> = {};
+    const query: Record<string, any> = { isActive: true };
 
     if (search) {
       query.$text = { $search: search };
     }
 
     const [stores, total] = await Promise.all([
-      Store.find(query)
+      Store.find(query).select('-owner')
         .limit(limit)
         .skip((page - 1) * limit)
         .sort({ createdAt: -1 }),
@@ -38,9 +55,28 @@ export const getAllStores = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+export const getAdminStores = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 20;
+    const search = req.query.search as string | undefined;
+    const query: Record<string, any> = req.user!.role === 'admin' ? {} : { owner: req.user!.id };
+    if (search) query.$text = { $search: search };
+
+    const [stores, total] = await Promise.all([
+      Store.find(query).limit(limit).skip((page - 1) * limit).sort({ createdAt: -1 }),
+      Store.countDocuments(query),
+    ]);
+
+    res.json({ success: true, data: { data: stores, total, page, limit, totalPages: Math.ceil(total / limit) } });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getStoreById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const store = await Store.findById(req.params.id);
+    const store = await Store.findOne({ _id: req.params.id, isActive: true }).select('-owner');
 
     if (!store) {
       throw new AppError('Store not found', 404);
@@ -52,9 +88,22 @@ export const getStoreById = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+export const getAdminStoreById = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const query: Record<string, any> = { _id: req.params.id };
+    if (req.user!.role !== 'admin') query.owner = req.user!.id;
+    const store = await Store.findOne(query);
+    if (!store) throw new AppError('Store not found', 404);
+    res.json({ success: true, data: store });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getStoreBySlug = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const store = await Store.findOne({ slug: req.params.slug, isActive: true })
+      .select('-owner')
       .populate('homeBillboards');
 
     if (!store) {
@@ -103,6 +152,8 @@ export const updateStore = async (req: AuthRequest, res: Response, next: NextFun
         throw new AppError('Slug already exists', 409);
       }
     }
+
+    await validateHomeSectionResources(String(store._id), input.homeSections);
 
     Object.assign(store, input);
     await store.save();

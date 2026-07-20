@@ -68,7 +68,4 @@ const transactionSchema = new Schema<ITransaction>(
     }
 );
 
-// Index for payment ID
-transactionSchema.index({ razorpayPaymentId: 1 });
-
 export const Transaction = mongoose.model<ITransaction>('Transaction', transactionSchema);

@@ -42,6 +42,7 @@ const productSchema = z.object({
   attributes: z.array(attributeSchema).default([]),
   hasVariants: z.boolean().default(false),
   variantOptions: z.array(variantOptionSchema).default([]),
+  sku: z.string().optional(), // Optional for products with variants
 });
 
 interface ProductFormProps {
@@ -88,8 +89,9 @@ export function ProductForm({
           mediaGallery: product.mediaGallery || [],
           mrp: product.mrp,
           sellingPrice: product.sellingPrice,
-          stock: product.stock,
-          isFeatured: product.isFeatured,
+	          stock: product.stock,
+	          sku: product.sku || '',
+	          isFeatured: product.isFeatured,
           isActive: product.isActive,
           attributes: product.attributes || [],
           hasVariants: product.hasVariants || false,
@@ -101,8 +103,9 @@ export function ProductForm({
           hasVariants: false,
           mrp: 0,
           sellingPrice: 0,
-          stock: 0,
-          mediaGallery: [],
+	          stock: 0,
+	          sku: '',
+	          mediaGallery: [],
           attributes: [],
           variantOptions: [],
         },
@@ -202,16 +205,24 @@ export function ProductForm({
             />
           </div>
 
-          <FormInput
-            label="Stock"
-            type="number"
-            placeholder="100"
-            required
-            error={errors.stock?.message as string | undefined}
-            {...register('stock')}
-          />
-        </div>
-      </Card>
+	          <FormInput
+	            label="Stock"
+	            type="number"
+	            placeholder="100"
+	            required
+	            error={errors.stock?.message as string | undefined}
+	            {...register('stock')}
+	          />
+
+	          <FormInput
+	            label="SKU"
+	            placeholder="SKU-001"
+	            helperText="Required for simple products. Variant products can use variant-level SKUs."
+	            error={errors.sku?.message as string | undefined}
+	            {...register('sku')}
+	          />
+	        </div>
+	      </Card>
 
       {/* Product Attributes Section */}
       <Card className="p-6">

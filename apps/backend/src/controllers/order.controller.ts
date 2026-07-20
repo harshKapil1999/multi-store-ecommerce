@@ -1,9 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import { Order } from '../models/order.model';
 import { Product } from '../models/product.model';
+import { ProductVariant } from '../models/variant.model';
+import { Store } from '../models/store.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
 import { generateOrderNumber } from '@repo/utils';
+import { mailService } from '../services/mail.service';
+
+const shouldCommitInventoryAtOrderCreation = (paymentMethod?: string) => paymentMethod === 'cod';
+
+const userOwnsStore = async (userId: string, storeId: string) => {
+  const store = await Store.findOne({ _id: storeId, owner: userId }).select('_id').lean();
+  return Boolean(store);
+};
 
 export const getAllOrders = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -11,8 +21,13 @@ export const getAllOrders = async (req: AuthRequest, res: Response, next: NextFu
     const query: any = {};
 
     // If customer, show only their orders
-    if (req.user!.role === 'customer') {
-      query['customer.userId'] = req.user!.id;
+    if (req.user && req.user.role === 'customer') {
+      query['customer.userId'] = req.user.id;
+    }
+
+    if (req.user?.role === 'store_owner') {
+      const stores = await Store.find({ owner: req.user.id }).select('_id').lean();
+      query.storeId = { $in: stores.map((store) => String(store._id)) };
     }
 
     const orders = await Order.find(query)
@@ -47,10 +62,38 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
 
     // Check access
     if (
-      req.user!.role === 'customer' &&
-      order.customer.userId !== req.user!.id
+      req.user &&
+      req.user.role === 'customer' &&
+      order.customer.userId !== req.user.id
     ) {
       throw new AppError('Not authorized to view this order', 403);
+    }
+
+    if (req.user?.role === 'store_owner' && !(await userOwnsStore(req.user.id, order.storeId))) {
+      throw new AppError('Not authorized to view this order', 403);
+    }
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const trackOrder = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const email = String(req.query.email || '').trim().toLowerCase();
+
+    if (!email) {
+      throw new AppError('Email is required to track this order', 400);
+    }
+
+    const order = await Order.findOne({
+      _id: req.params.id,
+      'customer.email': email,
+    });
+
+    if (!order) {
+      throw new AppError('Order not found', 404);
     }
 
     res.json({ success: true, data: order });
@@ -70,6 +113,10 @@ export const getOrdersByStore = async (
 
     const query: any = { storeId };
     if (status) query.status = status;
+
+    if (req.user!.role === 'store_owner' && !(await userOwnsStore(req.user!.id, storeId))) {
+      throw new AppError('Not authorized to view this store', 403);
+    }
 
     const orders = await Order.find(query)
       .limit(Number(limit))
@@ -93,61 +140,149 @@ export const getOrdersByStore = async (
   }
 };
 
-export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export const createOrder = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { storeId, items, customer, shippingAddress, billingAddress } = req.body;
+    const { storeId, items, customer, shippingAddress, billingAddress, paymentMethod } = req.body;
+    const authReq = req as AuthRequest;
+
+    if (!storeId || !Array.isArray(items) || items.length === 0) {
+      throw new AppError('Store and at least one order item are required', 400);
+    }
+
+    const store = await Store.findOne({ _id: storeId, isActive: true }).select('_id').lean();
+    if (!store) {
+      throw new AppError('Store not found or inactive', 404);
+    }
 
     // Validate products and calculate totals
     let subtotal = 0;
     const orderItems = [];
 
     for (const item of items) {
-      const product = await Product.findById(item.productId);
+      const quantity = Number(item.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+        throw new AppError('Item quantity must be between 1 and 20', 400);
+      }
+
+      const product = await Product.findOne({
+        _id: item.productId,
+        storeId,
+        isActive: true,
+      });
 
       if (!product) {
         throw new AppError(`Product ${item.productId} not found`, 404);
       }
 
-      if (product.stock < item.quantity) {
-        throw new AppError(`Insufficient inventory for ${product.name}`, 400);
+      let price = product.sellingPrice;
+      let name = product.name;
+      let sku = product.sku || `PRODUCT-${String(product._id).slice(-8)}`;
+      let image = product.featuredImage;
+
+      // If variant is selected, use variant details
+      if (item.variantId) {
+        const variant = await ProductVariant.findOne({
+          _id: item.variantId,
+          productId: String(product._id),
+          isActive: true,
+        });
+        if (!variant) {
+          throw new AppError(`Variant ${item.variantId} not found`, 404);
+        }
+
+        if (variant.stock < quantity) {
+          throw new AppError(`Insufficient inventory for variant ${variant.name}`, 400);
+        }
+
+        price = variant.price;
+        name = `${product.name} (${variant.name})`;
+        sku = variant.sku;
+        if (variant.images && variant.images.length > 0) {
+          image = variant.images[variant.featuredImageIndex || 0] || variant.images[0];
+        }
+
+        if (shouldCommitInventoryAtOrderCreation(paymentMethod)) {
+          variant.stock -= quantity;
+          await variant.save();
+        }
+      } else {
+        // Simple product stock check
+        if (product.stock < quantity) {
+          throw new AppError(`Insufficient inventory for ${product.name}`, 400);
+        }
+
+        if (shouldCommitInventoryAtOrderCreation(paymentMethod)) {
+          product.stock -= quantity;
+          await product.save();
+        }
       }
 
-      const itemTotal = product.sellingPrice * item.quantity;
+      const itemTotal = price * quantity;
       subtotal += itemTotal;
 
       orderItems.push({
         productId: String(product._id),
-        name: product.name,
-        quantity: item.quantity,
-        price: product.sellingPrice,
+        variantId: item.variantId ? String(item.variantId) : undefined,
+        name: name,
+        sku: sku,
+        quantity,
+        price: price,
         total: itemTotal,
-        image: product.featuredImage,
+        image: image,
+        selectedAttributes: item.selectedAttributes,
       });
-
-      // Update stock
-      product.stock -= item.quantity;
-      await product.save();
     }
 
-    const tax = subtotal * 0.1; // 10% tax
-    const shipping = 10; // Flat shipping
-    const total = subtotal + tax + shipping;
+    const shipping = subtotal > 2500 ? 0 : 750;
+    const total = subtotal + shipping;
 
     const order = await Order.create({
       storeId,
       orderNumber: generateOrderNumber(),
       customer: {
-        ...customer,
-        userId: req.user!.id,
+        userId: authReq.user?.id,
+        email: customer.email,
+        name: `${customer.firstName} ${customer.lastName}`,
+        phone: customer.phone,
       },
       items: orderItems,
       subtotal,
-      tax,
       shipping,
       total,
-      shippingAddress,
-      billingAddress,
+      status: paymentMethod === 'cod' ? 'confirmed' : 'pending',
+      paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
+      paymentMethod,
+      shippingAddress: {
+        firstName: shippingAddress.firstName,
+        lastName: shippingAddress.lastName,
+        address1: shippingAddress.addressLine1,
+        address2: shippingAddress.addressLine2,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        postalCode: shippingAddress.pincode,
+        country: shippingAddress.country,
+        phone: customer.phone,
+      },
+      billingAddress: {
+        firstName: billingAddress.firstName,
+        lastName: billingAddress.lastName,
+        address1: billingAddress.addressLine1,
+        address2: billingAddress.addressLine2,
+        city: billingAddress.city,
+        state: billingAddress.state,
+        postalCode: billingAddress.pincode,
+        country: billingAddress.country,
+        phone: customer.phone,
+      },
     });
+
+    if (paymentMethod === 'cod') {
+      try {
+        await mailService.sendOrderConfirmation(customer.email, order);
+      } catch (error) {
+        console.error('Error sending order confirmation email:', error);
+      }
+    }
 
     res.status(201).json({ success: true, data: order });
   } catch (error) {
@@ -168,10 +303,23 @@ export const updateOrderStatus = async (
       throw new AppError('Order not found', 404);
     }
 
-    order.status = status;
-    await order.save();
+	    if (req.user!.role === 'store_owner' && !(await userOwnsStore(req.user!.id, order.storeId))) {
+	      throw new AppError('Not authorized to update this order', 403);
+	    }
 
-    res.json({ success: true, data: order });
+	    const previousStatus = order.status;
+	    order.status = status;
+	    await order.save();
+
+	    if (previousStatus !== status) {
+	      try {
+	        await mailService.sendOrderStatusUpdate(order.customer.email, order, previousStatus);
+	      } catch (error) {
+	        console.error('Error sending order status update email:', error);
+	      }
+	    }
+
+	    res.json({ success: true, data: order });
   } catch (error) {
     next(error);
   }

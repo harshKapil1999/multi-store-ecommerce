@@ -1,6 +1,26 @@
 import { Request, Response } from 'express';
 import { Page } from '../models/page.model';
 import type { CreatePageInput, UpdatePageInput, AddPageSectionInput, UpdatePageSectionInput } from '@repo/types';
+import sanitizeHtml from 'sanitize-html';
+
+const sanitizeContent = (value?: string) => value ? sanitizeHtml(value, {
+  allowedTags: sanitizeHtml.defaults.allowedTags.concat(['h1', 'h2', 'img']),
+  allowedAttributes: {
+    ...sanitizeHtml.defaults.allowedAttributes,
+    a: ['href', 'target', 'rel'],
+    img: ['src', 'alt', 'title', 'width', 'height'],
+  },
+  allowedSchemes: ['http', 'https', 'mailto'],
+  transformTags: {
+    a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer' }, true),
+  },
+}) : value;
+
+const sanitizeSections = (sections: any[] = []) => sections.map((section) => ({
+  ...section,
+  content: sanitizeContent(section.content),
+  html: sanitizeContent(section.html),
+}));
 
 /**
  * Get all pages for a store
@@ -8,13 +28,7 @@ import type { CreatePageInput, UpdatePageInput, AddPageSectionInput, UpdatePageS
 export const getPages = async (req: Request, res: Response) => {
   try {
     const { storeId } = req.params;
-    const { published } = req.query;
-
-    const query: any = { storeId };
-
-    if (published !== undefined) {
-      query.isPublished = published === 'true';
-    }
+    const query: any = { storeId, isPublished: true };
 
     const pages = await Page.find(query).sort({ isHomePage: -1, createdAt: -1 });
 
@@ -28,6 +42,15 @@ export const getPages = async (req: Request, res: Response) => {
       message: 'Failed to fetch pages',
       error: error.message,
     });
+  }
+};
+
+export const getAdminPages = async (req: Request, res: Response) => {
+  try {
+    const pages = await Page.find({ storeId: req.params.storeId }).sort({ isHomePage: -1, createdAt: -1 });
+    res.json({ success: true, data: pages });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: 'Failed to fetch pages', error: error.message });
   }
 };
 
@@ -129,7 +152,7 @@ export const createPage = async (req: Request, res: Response) => {
     const page = await Page.create({
       ...pageData,
       storeId,
-      sections: pageData.sections || [],
+      sections: sanitizeSections(pageData.sections || []),
     });
 
     res.status(201).json({
@@ -159,7 +182,10 @@ export const createPage = async (req: Request, res: Response) => {
 export const updatePage = async (req: Request, res: Response) => {
   try {
     const { storeId, pageId } = req.params;
-    const updateData: UpdatePageInput = req.body;
+    const updateData: UpdatePageInput = {
+      ...req.body,
+      ...(req.body.sections ? { sections: sanitizeSections(req.body.sections) } : {}),
+    };
 
     const page = await Page.findOneAndUpdate(
       { _id: pageId, storeId },
@@ -263,7 +289,11 @@ export const togglePublish = async (req: Request, res: Response) => {
 export const addSection = async (req: Request, res: Response) => {
   try {
     const { storeId, pageId } = req.params;
-    const sectionData: AddPageSectionInput = req.body;
+    const sectionData: AddPageSectionInput = {
+      ...req.body,
+      content: sanitizeContent(req.body.content),
+      html: sanitizeContent(req.body.html),
+    };
 
     const page = await Page.findOne({ _id: pageId, storeId });
 
@@ -308,7 +338,11 @@ export const addSection = async (req: Request, res: Response) => {
 export const updateSection = async (req: Request, res: Response) => {
   try {
     const { storeId, pageId, sectionId } = req.params;
-    const sectionData: Partial<UpdatePageSectionInput> = req.body;
+    const sectionData: Partial<UpdatePageSectionInput> = {
+      ...req.body,
+      content: sanitizeContent(req.body.content),
+      html: sanitizeContent(req.body.html),
+    };
 
     const page = await Page.findOne({ _id: pageId, storeId });
 

@@ -4,26 +4,72 @@ import { Transaction } from '../models/transaction.model';
 import { Order } from '../models/order.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
+import { mailService } from '../services/mail.service';
+import { finalizeCapturedPayment } from '../services/order-fulfillment.service';
 import crypto from 'crypto';
 
+type WebhookRequest = Request & {
+    rawBody?: string;
+};
+
+const normalizeNotes = (notes: Record<string, unknown> | undefined, order: InstanceType<typeof Order>) => ({
+    orderId: String(order._id),
+    orderNumber: order.orderNumber,
+    storeId: order.storeId,
+    ...Object.fromEntries(
+        Object.entries(notes || {}).map(([key, value]) => [key, String(value)])
+    ),
+});
+
+const signaturesMatch = (received: string | undefined, expected: string) => {
+    if (!received) return false;
+
+    const receivedBuffer = Buffer.from(received, 'hex');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+
+    return receivedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(receivedBuffer, expectedBuffer);
+};
+
 export const createRazorpayOrder = async (
-    req: AuthRequest,
+    req: Request,
     res: Response,
     next: NextFunction
 ) => {
     try {
-        const { amount, currency, orderId, storeId, notes } = req.body;
+        const { currency, orderId, storeId, notes } = req.body;
 
-        if (!amount || amount <= 0) {
-            throw new AppError('Invalid amount', 400);
+        const order = await Order.findOne({ _id: orderId, storeId });
+        if (!order) {
+            throw new AppError('Order not found', 404);
         }
 
-        // Create Razorpay order
+        if (order.paymentStatus === 'paid') {
+            throw new AppError('Order has already been paid', 409);
+        }
+
+        const existingTransaction = await Transaction.findOne({
+            orderId,
+            status: { $in: ['created', 'authorized'] },
+        }).sort({ createdAt: -1 });
+
+        if (existingTransaction) {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    razorpayOrderId: existingTransaction.razorpayOrderId,
+                    amount: order.total * 100,
+                    currency: existingTransaction.currency,
+                    transactionId: existingTransaction._id,
+                    keyId: process.env.RAZORPAY_KEY_ID,
+                },
+            });
+        }
+
         const razorpayOrder = await PaymentService.createOrder({
-            amount,
+            amount: order.total,
             currency: currency || 'INR',
-            receipt: orderId,
-            notes,
+            receipt: order.orderNumber,
+            notes: normalizeNotes(notes, order),
         });
 
         // Create transaction record
@@ -31,10 +77,10 @@ export const createRazorpayOrder = async (
             orderId,
             storeId,
             razorpayOrderId: razorpayOrder.id,
-            amount,
+            amount: order.total,
             currency: currency || 'INR',
             status: 'created',
-            notes,
+            notes: normalizeNotes(notes, order),
         });
 
         res.status(201).json({
@@ -44,6 +90,7 @@ export const createRazorpayOrder = async (
                 amount: razorpayOrder.amount,
                 currency: razorpayOrder.currency,
                 transactionId: transaction._id,
+                keyId: process.env.RAZORPAY_KEY_ID,
             },
         });
     } catch (error) {
@@ -52,7 +99,7 @@ export const createRazorpayOrder = async (
 };
 
 export const verifyPayment = async (
-    req: AuthRequest,
+    req: Request,
     res: Response,
     next: NextFunction
 ) => {
@@ -74,43 +121,57 @@ export const verifyPayment = async (
             throw new AppError('Invalid payment signature', 400);
         }
 
-        // Update transaction
         const transaction = await Transaction.findOne({ razorpayOrderId });
         if (!transaction) {
             throw new AppError('Transaction not found', 404);
         }
 
-        transaction.razorpayPaymentId = razorpayPaymentId;
-        transaction.razorpaySignature = razorpaySignature;
-        transaction.status = 'captured';
-
         // Fetch payment details from Razorpay
+        let paymentDetails;
         try {
-            const paymentDetails = await PaymentService.fetchPayment(razorpayPaymentId);
-            transaction.method = paymentDetails.method;
-            transaction.email = paymentDetails.email;
-            transaction.phone = String(paymentDetails.contact || '');
+            paymentDetails = await PaymentService.fetchPayment(razorpayPaymentId);
         } catch (error) {
-            // Continue even if fetch fails
+            throw new AppError('Payment could not be verified with Razorpay', 502);
         }
 
-        await transaction.save();
+        if (paymentDetails.order_id !== razorpayOrderId) {
+            throw new AppError('Payment does not belong to this Razorpay order', 400);
+        }
 
-        // Update order payment status
-        const order = await Order.findById(transaction.orderId);
-        if (order) {
-            order.paymentStatus = 'paid';
-            order.transactionId = String(transaction._id);
-            order.razorpayOrderId = razorpayOrderId;
-            await order.save();
+        if (paymentDetails.amount !== Math.round(transaction.amount * 100)) {
+            throw new AppError('Payment amount does not match the transaction amount', 400);
+        }
+
+        if (paymentDetails.status !== 'captured' && paymentDetails.captured !== true) {
+            throw new AppError('Payment is not captured yet', 409);
+        }
+
+        const fulfillment = await finalizeCapturedPayment({
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+            method: paymentDetails.method,
+            email: paymentDetails.email,
+            phone: String(paymentDetails.contact || ''),
+        });
+
+        if (fulfillment.state === 'fulfilled' && fulfillment.order) {
+            try {
+                await mailService.sendOrderConfirmation(fulfillment.order.customer.email, fulfillment.order);
+            } catch (error) {
+                console.error('Error sending order confirmation email:', error);
+            }
         }
 
         res.json({
             success: true,
-            message: 'Payment verified successfully',
+            message: fulfillment.state === 'manual_review'
+                ? 'Payment verified. Order is awaiting inventory reconciliation.'
+                : 'Payment verified successfully',
             data: {
                 orderId: transaction.orderId,
                 transactionId: String(transaction._id),
+                state: fulfillment.state,
             },
         });
     } catch (error) {
@@ -124,20 +185,25 @@ export const handleWebhook = async (
     next: NextFunction
 ) => {
     try {
-        const webhookSignature = req.headers['x-razorpay-signature'] as string;
+        const webhookSignature = req.headers['x-razorpay-signature'] as string | undefined;
         const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+        const rawBody = (req as WebhookRequest).rawBody;
 
         if (!webhookSecret) {
             throw new AppError('Webhook secret not configured', 500);
         }
 
+        if (!rawBody) {
+            throw new AppError('Webhook raw payload was not captured', 400);
+        }
+
         // Verify webhook signature
         const expectedSignature = crypto
             .createHmac('sha256', webhookSecret)
-            .update(JSON.stringify(req.body))
+            .update(rawBody)
             .digest('hex');
 
-        if (webhookSignature !== expectedSignature) {
+        if (!signaturesMatch(webhookSignature, expectedSignature)) {
             throw new AppError('Invalid webhook signature', 400);
         }
 
@@ -147,6 +213,9 @@ export const handleWebhook = async (
         // Handle different events
         switch (event) {
             case 'payment.captured':
+                await handlePaymentCaptured(payload.payment.entity);
+                break;
+            case 'order.paid':
                 await handlePaymentCaptured(payload.payment.entity);
                 break;
             case 'payment.failed':
@@ -211,23 +280,19 @@ export const refundPayment = async (
 
 // Helper functions for webhook event handlers
 async function handlePaymentCaptured(payment: any) {
-    const transaction = await Transaction.findOne({
+    const fulfillment = await finalizeCapturedPayment({
         razorpayOrderId: payment.order_id,
+        razorpayPaymentId: payment.id,
+        method: payment.method,
+        email: payment.email,
+        phone: String(payment.contact || ''),
     });
 
-    if (transaction) {
-        transaction.razorpayPaymentId = payment.id;
-        transaction.status = 'captured';
-        transaction.method = payment.method;
-        transaction.email = payment.email;
-        transaction.phone = payment.contact;
-        await transaction.save();
-
-        const order = await Order.findById(transaction.orderId);
-        if (order) {
-            order.paymentStatus = 'paid';
-            order.transactionId = String(transaction._id);
-            await order.save();
+    if (fulfillment.state === 'fulfilled' && fulfillment.order) {
+        try {
+            await mailService.sendOrderConfirmation(fulfillment.order.customer.email, fulfillment.order);
+        } catch (error) {
+            console.error('Error sending order confirmation email:', error);
         }
     }
 }

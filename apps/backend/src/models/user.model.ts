@@ -28,6 +28,20 @@ const userSchema = new Schema<IUser>(
       enum: ['customer', 'admin', 'store_owner'],
       default: 'customer',
     },
+    addresses: [
+      {
+        firstName: String,
+        lastName: String,
+        address1: String,
+        address2: String,
+        city: String,
+        state: String,
+        country: String,
+        postalCode: String,
+        phone: String,
+        isDefault: { type: Boolean, default: false },
+      }
+    ],
   },
   {
     timestamps: true,

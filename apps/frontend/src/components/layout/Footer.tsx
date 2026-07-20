@@ -4,18 +4,22 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store-context';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { CategoryWithChildren } from '@repo/types';
-import { Twitter, Instagram, Facebook, Youtube } from 'lucide-react';
+import { CategoryWithChildren, Page } from '@repo/types';
 
 export function Footer() {
   const { store } = useStore();
   const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
+  const [pages, setPages] = useState<Page[]>([]);
 
   useEffect(() => {
     if (store?._id) {
-      api.get<CategoryWithChildren[]>(`/stores/${store._id}/categories/tree`)
-        .then((data) => {
-          if (Array.isArray(data)) setCategories(data);
+      Promise.all([
+        api.get<CategoryWithChildren[]>(`/stores/${store._id}/categories/tree`),
+        api.get<Page[]>(`/stores/${store._id}/pages?published=true`),
+      ])
+        .then(([categoryData, pageData]) => {
+          if (Array.isArray(categoryData)) setCategories(categoryData);
+          if (Array.isArray(pageData)) setPages(pageData.filter((page) => !page.isHomePage));
         })
         .catch(err => console.error(err));
     }
@@ -26,7 +30,8 @@ export function Footer() {
   // Filter only top-level categories
   const topLevelCategories = categories.filter(cat => !cat.parentId);
 
-  const footerSections = [
+  const configuredSections = store.footer?.sections?.filter((section) => section.links?.length) || [];
+  const footerSections = configuredSections.length > 0 ? configuredSections : [
     {
       title: 'Shop',
       links: topLevelCategories.map(cat => ({
@@ -35,36 +40,16 @@ export function Footer() {
       }))
     },
     {
-      title: 'Company',
-      links: [
-        { label: 'About Us', href: `/${store.slug}/about` },
-        { label: 'Contact Us', href: `/${store.slug}/contact` },
-        { label: 'Blog', href: `/${store.slug}/blog` }
-      ]
-    },
-    {
-      title: 'Support',
-      links: [
-        { label: 'FAQs', href: `/${store.slug}/faq` },
-        { label: 'Shipping Info', href: `/${store.slug}/shipping` },
-        { label: 'Returns', href: `/${store.slug}/returns` }
-      ]
-    },
-    {
-      title: 'Legal',
-      links: [
-        { label: 'Privacy Policy', href: `/${store.slug}/privacy` },
-        { label: 'Terms & Conditions', href: `/${store.slug}/terms` },
-        { label: 'Cookies Policy', href: `/${store.slug}/cookies` }
-      ]
+      title: 'Information',
+      links: pages.map((page) => ({ label: page.title, href: `/${store.slug}/${page.slug}` })),
     }
-  ];
+  ].filter((section) => section.links.length > 0);
 
   return (
     <footer className="bg-black text-white pt-16 pb-8 border-t border-white/10">
       <div className="container mx-auto px-4 md:px-8">
         {/* Top Sections */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           {footerSections.map((section, idx) => (
             <div key={idx}>
               <h3 className="font-bold text-sm uppercase tracking-wider mb-4 text-white">
@@ -84,24 +69,6 @@ export function Footer() {
               </ul>
             </div>
           ))}
-          
-          {/* Social Icons */}
-          <div className="flex items-start">
-             <div className="flex gap-4">
-                <Link href="#" className="p-2 bg-gray-800 rounded-full hover:bg-white hover:text-black transition-all">
-                  <Twitter className="w-4 h-4" />
-                </Link>
-                <Link href="#" className="p-2 bg-gray-800 rounded-full hover:bg-white hover:text-black transition-all">
-                  <Instagram className="w-4 h-4" />
-                </Link>
-                <Link href="#" className="p-2 bg-gray-800 rounded-full hover:bg-white hover:text-black transition-all">
-                  <Facebook className="w-4 h-4" />
-                </Link>
-                <Link href="#" className="p-2 bg-gray-800 rounded-full hover:bg-white hover:text-black transition-all">
-                  <Youtube className="w-4 h-4" />
-                </Link>
-             </div>
-          </div>
         </div>
 
         {/* Bottom Bar */}

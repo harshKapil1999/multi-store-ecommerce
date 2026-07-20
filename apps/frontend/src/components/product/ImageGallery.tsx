@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Media } from '@repo/types';
 
 interface ImageGalleryProps {
@@ -9,19 +9,31 @@ interface ImageGalleryProps {
 }
 
 export function ImageGallery({ featuredImage, mediaGallery }: ImageGalleryProps) {
-  const images = [
+  // Combine featured + gallery, remove duplicates based on URL
+  const allImages = [
     { url: featuredImage, type: 'image' },
     ...(mediaGallery || [])
   ];
-  
-  const [activeImage, setActiveImage] = useState(images[0]);
+
+  const uniqueImages = allImages.filter((img, index, self) =>
+    index === self.findIndex((t) => t.url === img.url)
+  );
+
+  const [activeImage, setActiveImage] = useState(uniqueImages[0]);
+
+  // Update active image when featuredImage changes (e.g. variant selection)
+  useEffect(() => {
+    setActiveImage(uniqueImages[0]);
+  }, [featuredImage]);
+
+  const images = uniqueImages;
 
   return (
     <div className="flex flex-col-reverse md:flex-row gap-4 relative md:sticky md:top-24">
        {/* Thumbnails */}
        <div className="flex md:flex-col gap-4 overflow-x-auto md:overflow-y-auto md:w-20 md:h-[600px] scrollbar-hide">
           {images.map((img, idx) => (
-             <button 
+             <button
                key={idx}
                onClick={() => setActiveImage(img)}
                onMouseEnter={() => setActiveImage(img)}
@@ -41,18 +53,18 @@ export function ImageGallery({ featuredImage, mediaGallery }: ImageGalleryProps)
        {/* Main Image */}
        <div className="flex-1 aspect-[3/4] md:aspect-auto md:h-[600px] bg-gray-100 dark:bg-zinc-900 rounded-lg overflow-hidden relative group">
           {activeImage.type === 'video' ? (
-            <video 
-              src={activeImage.url} 
-              controls 
-              autoPlay 
-              muted 
+            <video
+              src={activeImage.url}
+              controls
+              autoPlay
+              muted
               loop
               className="w-full h-full object-contain"
             />
           ) : (
-            <img 
-              src={activeImage.url} 
-              alt="Product View" 
+            <img
+              src={activeImage.url}
+              alt="Product View"
               className="w-full h-full object-cover object-center"
             />
           )}

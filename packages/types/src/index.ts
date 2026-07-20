@@ -4,6 +4,7 @@ export interface User {
   email: string;
   name: string;
   role: 'customer' | 'admin' | 'store_owner';
+  addresses?: Address[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,7 +30,38 @@ export interface Store {
   createdAt: Date;
   updatedAt: Date;
   homeBillboards?: Billboard[]; // Populated
+  homeSections?: HomeSectionConfig[];
 }
+
+export type HomeSectionType =
+  | 'featured_categories'
+  | 'category_collection'
+  | 'spotlight'
+  | 'featured_products'
+  | 'newsletter';
+
+export interface HomeSectionConfig {
+  id: string;
+  type: HomeSectionType;
+  title: string;
+  subtitle?: string;
+  isVisible: boolean;
+  order: number;
+  categoryIds?: string[];
+  productIds?: string[];
+  limit?: number;
+  layout?: 'grid' | 'carousel';
+  buttonLabel?: string;
+  consentText?: string;
+}
+
+export const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
+  { id: 'featured-categories', type: 'featured_categories', title: 'Featured', isVisible: true, order: 0, categoryIds: [], limit: 4, layout: 'grid' },
+  { id: 'shop-by-collection', type: 'category_collection', title: 'Shop by Collection', isVisible: true, order: 1, categoryIds: [], limit: 6, layout: 'carousel' },
+  { id: 'spotlight', type: 'spotlight', title: 'Spotlight', isVisible: true, order: 2, productIds: [], limit: 8, layout: 'carousel' },
+  { id: 'featured-products', type: 'featured_products', title: 'Featured Products', isVisible: false, order: 3, productIds: [], limit: 8, layout: 'grid' },
+  { id: 'newsletter', type: 'newsletter', title: 'Join our community', subtitle: 'Sign up for product releases, store news, and member updates.', isVisible: true, order: 4, buttonLabel: 'Join now', consentText: 'You can unsubscribe at any time.' },
+];
 
 export interface StoreTheme {
   primaryColor: string;
@@ -115,6 +147,7 @@ export interface Product {
   slug: string;
   description: string;
   featuredImage: string; // Cloudflare R2 URL
+  sku: string;
   mediaGallery: Media[];
   mrp: number; // Maximum Retail Price
   sellingPrice: number;
@@ -141,9 +174,11 @@ export interface ProductVariant {
   name: string; // e.g., "Red - Size M"
   sku: string;
   price: number;
+  compareAtPrice?: number; // MRP / original price for showing discounts
   stock: number;
   attributes: Record<string, string>; // e.g., { size: 'M', color: 'Red' }
   images?: string[];
+  featuredImageIndex?: number; // Index of featured image in images array
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -153,8 +188,11 @@ export interface CreateVariantInput {
   name: string;
   sku: string;
   price: number;
+  compareAtPrice?: number;
   stock: number;
   attributes: Record<string, string>;
+  images?: string[];
+  featuredImageIndex?: number;
   isActive?: boolean;
 }
 
@@ -162,8 +200,11 @@ export interface UpdateVariantInput {
   name?: string;
   sku?: string;
   price?: number;
+  compareAtPrice?: number;
   stock?: number;
   attributes?: Record<string, string>;
+  images?: string[];
+  featuredImageIndex?: number;
   isActive?: boolean;
 }
 
@@ -255,6 +296,7 @@ export interface Address {
 
 // Cart Types
 export interface CartItem {
+  storeId: string;
   productId: string;
   variantId?: string;
   quantity: number;
@@ -329,6 +371,12 @@ export interface CreateStoreRequest {
   logo?: string;
   theme?: Partial<StoreTheme>;
   isActive?: boolean;
+  domain?: string;
+  navigation?: NavItem[];
+  footer?: FooterConfig;
+  topBar?: TopBarConfig;
+  homeBillboards?: string[];
+  homeSections?: HomeSectionConfig[];
 }
 
 export interface UpdateStoreRequest {
@@ -338,6 +386,12 @@ export interface UpdateStoreRequest {
   logo?: string;
   theme?: Partial<StoreTheme>;
   isActive?: boolean;
+  domain?: string;
+  navigation?: NavItem[];
+  footer?: FooterConfig;
+  topBar?: TopBarConfig;
+  homeBillboards?: string[];
+  homeSections?: HomeSectionConfig[];
 }
 
 export interface ToggleStoreRequest {
@@ -427,6 +481,7 @@ export interface ProductFilters extends PaginationParams {
 export interface CreateProductInput {
   name: string;
   slug: string;
+  sku: string;
   description: string;
   featuredImage: string;
   mediaGallery?: Media[];

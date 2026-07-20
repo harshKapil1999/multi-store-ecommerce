@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
+import { isValidObjectId } from 'mongoose';
 import { Store } from '../models/store.model';
 import { AppError } from './error-handler';
+import type { AuthRequest } from './auth';
 
 export interface StoreContextRequest extends Request {
   storeContext?: {
@@ -21,8 +23,8 @@ export const validateStoreContext = async (
   try {
     const { storeId } = req.params;
 
-    if (!storeId) {
-      throw new AppError('Store ID is required', 400);
+    if (!storeId || !isValidObjectId(storeId)) {
+      throw new AppError('A valid store ID is required', 400);
     }
 
     const store = await Store.findById(storeId);
@@ -43,4 +45,26 @@ export const validateStoreContext = async (
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * Must run after authenticate. Admins can manage every store; store owners can
+ * only mutate resources belonging to a store they own.
+ */
+export const requireStoreAccess = (
+  req: StoreContextRequest & AuthRequest,
+  _res: Response,
+  next: NextFunction
+) => {
+  const store = req.storeContext?.store;
+
+  if (!store || !req.user) {
+    return next(new AppError('Store access context is missing', 403));
+  }
+
+  if (req.user.role === 'admin' || String(store.owner) === req.user.id) {
+    return next();
+  }
+
+  return next(new AppError('Not authorized to manage this store', 403));
 };

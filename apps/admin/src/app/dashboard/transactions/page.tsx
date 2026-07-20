@@ -33,7 +33,7 @@ export default function TransactionsPage() {
       header: 'Amount',
       cell: ({ row }) => (
         <span className="font-semibold text-green-600 dark:text-green-400">
-          ₹{(row.original.amount / 100).toLocaleString('en-IN')}
+          ₹{row.original.amount.toLocaleString('en-IN')}
         </span>
       ),
     },
@@ -104,9 +104,9 @@ export default function TransactionsPage() {
             <div>
               <p className="text-sm text-muted-foreground">Total Captured</p>
               <p className="text-2xl font-bold">
-                ₹{(transactions
+                ₹{transactions
                   .filter(t => t.status === 'captured')
-                  .reduce((acc, t) => acc + t.amount, 0) / 100).toLocaleString('en-IN')}
+                  .reduce((acc, t) => acc + t.amount, 0).toLocaleString('en-IN')}
               </p>
             </div>
           </div>

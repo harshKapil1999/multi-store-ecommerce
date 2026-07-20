@@ -39,9 +39,9 @@ export const listCategories = async (req: AuthRequest, res: Response, next: Next
 
 export const getCategoryById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const { id, storeId } = req.params;
 
-    const category = await Category.findById(id);
+    const category = await Category.findOne({ _id: id, storeId });
     if (!category) {
       throw new AppError('Category not found', 404);
     }
@@ -103,7 +103,7 @@ export const updateCategory = async (req: AuthRequest, res: Response, next: Next
     const { id, storeId } = req.params;
     const input = req.body as UpdateCategoryInput;
 
-    const category = await Category.findById(id);
+    const category = await Category.findOne({ _id: id, storeId });
     if (!category) {
       throw new AppError('Category not found', 404);
     }
@@ -132,7 +132,7 @@ export const deleteCategory = async (req: AuthRequest, res: Response, next: Next
   try {
     const { id, storeId } = req.params;
 
-    const category = await Category.findById(id);
+    const category = await Category.findOne({ _id: id, storeId });
     if (!category) {
       throw new AppError('Category not found', 404);
     }
@@ -203,4 +203,3 @@ export const getCategoryTree = async (req: AuthRequest, res: Response, next: Nex
     next(error);
   }
 };
-

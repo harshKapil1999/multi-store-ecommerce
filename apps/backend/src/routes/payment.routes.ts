@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import * as paymentController from '../controllers/payment.controller';
 import { authenticate, authorize } from '../middleware/auth';
+import { paymentRateLimit } from '../middleware/rate-limit';
 
-const router = Router();
+const router: Router = Router();
 
-// Create Razorpay order (authenticated users)
-router.post('/create-order', authenticate, paymentController.createRazorpayOrder);
+// Create Razorpay order (public for guest checkout)
+router.post('/create-order', paymentRateLimit, paymentController.createRazorpayOrder);
 
-// Verify payment
-router.post('/verify', authenticate, paymentController.verifyPayment);
+// Verify payment (public for guest checkout)
+router.post('/verify', paymentRateLimit, paymentController.verifyPayment);
 
 // Webhook (no auth required, validated by signature)
 router.post('/webhook', paymentController.handleWebhook);

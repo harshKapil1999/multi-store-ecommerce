@@ -2,10 +2,12 @@
 
 import { useSelectedStore } from '@/contexts/store-context';
 import { useCreatePage } from '@/hooks/usePages';
-import { Card, Button } from '@/components/index';
+import { Card, Button, Checkbox, Input, Textarea } from '@/components/index';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { RichTextEditor } from '@/components/RichTextEditor';
+import { PAGE_TEMPLATES } from '@/lib/page-templates';
 
 export default function NewPagePage() {
   const router = useRouter();
@@ -15,24 +17,32 @@ export default function NewPagePage() {
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
+  const [content, setContent] = useState('');
   const [isHomePage, setIsHomePage] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!selectedStoreId) return;
 
-    const result = await createPage.mutateAsync({
-      title,
-      slug,
-      description,
-      isHomePage,
-      isPublished: false,
-      sections: [],
-    });
+    try {
+      const result = await createPage.mutateAsync({
+        title,
+        slug,
+        description,
+        isHomePage,
+        metaTitle: title,
+        metaDescription: description,
+        isPublished,
+        sections: content ? [{ type: 'text_content', title, content, order: 0, isVisible: true }] : [],
+      });
 
-    if (result?.data?._id) {
-      router.push(`/dashboard/pages/${result.data._id}`);
+      if (result?.data?._id) {
+        router.push(`/dashboard/pages/${result.data._id}`);
+      }
+    } catch {
+      // The mutation displays the backend message as a toast.
     }
   };
 
@@ -46,6 +56,14 @@ export default function NewPagePage() {
   const handleTitleChange = (value: string) => {
     setTitle(value);
     setSlug(generateSlug(value));
+  };
+
+  const applyTemplate = (key: keyof typeof PAGE_TEMPLATES) => {
+    const template = PAGE_TEMPLATES[key];
+    setTitle(template.title);
+    setSlug(template.slug);
+    setDescription(template.description);
+    setContent(template.content);
   };
 
   if (!selectedStoreId) {
@@ -77,18 +95,31 @@ export default function NewPagePage() {
       <Card className="p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
+            <p className="mb-3 text-sm font-medium">Start from a template</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => applyTemplate('privacy')}>Privacy Policy</Button>
+              <Button type="button" variant="outline" onClick={() => applyTemplate('terms')}>Terms &amp; Conditions</Button>
+              <Button type="button" variant="outline" onClick={() => applyTemplate('returns')}>Returns &amp; Refunds</Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Templates are a starting point. Review dates, return windows, and legal details before publishing.</p>
+          </div>
+          <div>
             <label htmlFor="title" className="block text-sm font-medium mb-2">
               Page Title *
             </label>
-            <input
+            <Input
               id="title"
               type="text"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., About Us, Contact, New Collection"
               required
             />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">Page Content</label>
+            <RichTextEditor value={content} onChange={setContent} />
           </div>
 
           <div>
@@ -97,12 +128,12 @@ export default function NewPagePage() {
             </label>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">/</span>
-              <input
+              <Input
                 id="slug"
                 type="text"
                 value={slug}
                 onChange={(e) => setSlug(generateSlug(e.target.value))}
-                className="flex-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1"
                 placeholder="about-us"
                 required
               />
@@ -116,27 +147,33 @@ export default function NewPagePage() {
             <label htmlFor="description" className="block text-sm font-medium mb-2">
               Description
             </label>
-            <textarea
+            <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={4}
               placeholder="A brief description of this page (for SEO)"
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="isHomePage"
               checked={isHomePage}
-              onChange={(e) => setIsHomePage(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              onCheckedChange={(checked) => setIsHomePage(checked === true)}
             />
             <label htmlFor="isHomePage" className="text-sm font-medium">
               Set as Home Page
             </label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="isPublished"
+              checked={isPublished}
+              onCheckedChange={(checked) => setIsPublished(checked === true)}
+            />
+            <label htmlFor="isPublished" className="text-sm font-medium">Publish immediately</label>
           </div>
 
           <div className="flex gap-3">

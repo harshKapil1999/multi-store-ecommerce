@@ -1,0 +1,26 @@
+FROM node:22-alpine AS build
+
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY apps/backend/package.json apps/backend/package.json
+COPY packages/types/package.json packages/types/package.json
+COPY packages/utils/package.json packages/utils/package.json
+
+RUN pnpm install --frozen-lockfile
+
+COPY apps/backend apps/backend
+COPY packages/types packages/types
+COPY packages/utils packages/utils
+
+RUN pnpm --filter @repo/types build \
+  && pnpm --filter @repo/utils build \
+  && pnpm --filter @repo/backend build
+
+ENV NODE_ENV=production
+ENV PORT=4000
+EXPOSE 4000
+
+USER node
+CMD ["node", "apps/backend/dist/index.js"]

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as uploadController from '../controllers/upload.controller';
 import { authenticate, authorize } from '../middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 // All routes protected (authenticated users)
 router.use(authenticate);

@@ -15,13 +15,14 @@ export function ProductView({ product, variants, categoryName }: ProductViewProp
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
 
   // Determine active images: Variant images -> Product featured + gallery
+  const sortedProductMedia = [...(product.mediaGallery || [])].sort((a, b) => a.order - b.order);
   const activeFeaturedImage = (selectedVariant && selectedVariant.images && selectedVariant.images.length > 0)
-    ? selectedVariant.images[0]
+    ? selectedVariant.images[selectedVariant.featuredImageIndex || 0] || selectedVariant.images[0]
     : product.featuredImage;
 
   const activeMediaGallery = (selectedVariant && selectedVariant.images && selectedVariant.images.length > 0)
     ? selectedVariant.images.map(url => ({ url, type: 'image' })) as any
-    : product.mediaGallery;
+    : sortedProductMedia;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">

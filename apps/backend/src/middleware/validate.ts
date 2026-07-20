@@ -13,7 +13,15 @@ export const validate = (schema: ZodSchema, location: Location = 'body') => {
     try {
       const data = (req as any)[location];
       const parsed = schema.parse(data);
-      (req as any)[location] = parsed; // overwrite with parsed/stripped values
+      if (location === 'query') {
+        Object.defineProperty(req, 'query', {
+          value: parsed,
+          enumerable: true,
+          configurable: true,
+        });
+      } else {
+        (req as any)[location] = parsed; // overwrite with parsed/stripped values
+      }
       next();
     } catch (err) {
       if (err instanceof ZodError) {

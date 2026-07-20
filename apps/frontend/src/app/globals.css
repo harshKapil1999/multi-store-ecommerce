@@ -49,6 +49,35 @@
   }
 }
 
+.store-page-content {
+  color: rgb(82 82 91);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.dark .store-page-content {
+  color: rgb(161 161 170);
+}
+
+.store-page-content h1,
+.store-page-content h2,
+.store-page-content h3 {
+  color: currentColor;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 2rem 0 0.75rem;
+}
+
+.store-page-content h2 { font-size: 1.75rem; }
+.store-page-content h3 { font-size: 1.3rem; }
+.store-page-content p { margin: 0.8rem 0; }
+.store-page-content ul,
+.store-page-content ol { margin: 0.8rem 0; padding-left: 1.5rem; }
+.store-page-content ul { list-style: disc; }
+.store-page-content ol { list-style: decimal; }
+.store-page-content a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.store-page-content blockquote { border-left: 3px solid currentColor; margin: 1.25rem 0; padding-left: 1rem; }
+
 @layer base {
   * {
     @apply border-border;

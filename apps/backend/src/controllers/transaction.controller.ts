@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { Transaction } from '../models/transaction.model';
+import { Store } from '../models/store.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
+
+const getAccessibleStoreIds = async (req: AuthRequest) => {
+    if (req.user!.role === 'admin') return null;
+
+    const stores = await Store.find({ owner: req.user!.id }).select('_id').lean();
+    return stores.map((store) => String(store._id));
+};
 
 export const getAllTransactions = async (
     req: AuthRequest,
@@ -15,10 +23,13 @@ export const getAllTransactions = async (
         if (status) query.status = status;
         if (storeId) query.storeId = storeId;
 
-        // If not admin, only show own store transactions
-        if (req.user!.role === 'store_owner') {
-            // TODO: Get stores owned by user
-            // For now, filter by storeId from query
+        const accessibleStoreIds = await getAccessibleStoreIds(req);
+        if (accessibleStoreIds) {
+            if (storeId && !accessibleStoreIds.includes(String(storeId))) {
+                throw new AppError('Not authorized to view this store', 403);
+            }
+
+            query.storeId = storeId ? String(storeId) : { $in: accessibleStoreIds };
         }
 
         const transactions = await Transaction.find(query)
@@ -44,7 +55,7 @@ export const getAllTransactions = async (
 };
 
 export const getTransactionById = async (
-    req: Request,
+    req: AuthRequest,
     res: Response,
     next: NextFunction
 ) => {
@@ -53,6 +64,11 @@ export const getTransactionById = async (
 
         if (!transaction) {
             throw new AppError('Transaction not found', 404);
+        }
+
+        const accessibleStoreIds = await getAccessibleStoreIds(req);
+        if (accessibleStoreIds && !accessibleStoreIds.includes(transaction.storeId)) {
+            throw new AppError('Not authorized to view this transaction', 403);
         }
 
         res.json({ success: true, data: transaction });
@@ -69,6 +85,13 @@ export const getTransactionsByStore = async (
     try {
         const { storeId } = req.params;
         const { page = 1, limit = 20, status } = req.query;
+
+        if (req.user!.role !== 'admin') {
+            const accessibleStoreIds = await getAccessibleStoreIds(req);
+            if (!accessibleStoreIds?.includes(storeId)) {
+                throw new AppError('Not authorized to view this store', 403);
+            }
+        }
 
         const query: any = { storeId };
         if (status) query.status = status;
@@ -96,7 +119,7 @@ export const getTransactionsByStore = async (
 };
 
 export const getTransactionByOrderId = async (
-    req: Request,
+    req: AuthRequest,
     res: Response,
     next: NextFunction
 ) => {
@@ -107,6 +130,11 @@ export const getTransactionByOrderId = async (
 
         if (!transaction) {
             throw new AppError('Transaction not found', 404);
+        }
+
+        const accessibleStoreIds = await getAccessibleStoreIds(req);
+        if (accessibleStoreIds && !accessibleStoreIds.includes(transaction.storeId)) {
+            throw new AppError('Not authorized to view this transaction', 403);
         }
 
         res.json({ success: true, data: transaction });

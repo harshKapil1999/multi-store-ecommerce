@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export interface FormFieldProps {
   label?: string;
@@ -32,7 +33,7 @@ export const FormInput = forwardRef<
     )}
     <Input
       ref={ref}
-      className={error ? 'border-red-500' : ''}
+      className={cn(className, error && 'border-red-500')}
       {...props}
     />
     {error && <p className="text-sm text-red-500">{error}</p>}
@@ -54,7 +55,7 @@ export const FormTextarea = forwardRef<
     )}
     <Textarea
       ref={ref}
-      className={error ? 'border-red-500' : ''}
+      className={cn(className, error && 'border-red-500')}
       {...props}
     />
     {error && <p className="text-sm text-red-500">{error}</p>}

@@ -1,26 +1,39 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store-context';
 import Link from 'next/link';
 import { NavDropdown } from './NavDropdown';
-import { Search, ShoppingBag, Heart, User, Menu } from 'lucide-react';
-import { usePathname } from 'next/navigation';
-import { useEffect } from 'react';
+import { Search, ShoppingBag, Heart, Menu, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { CategoryWithChildren } from '@repo/types';
 import { useCart } from '@/lib/cart-store';
 import { CartSidebar } from '../cart/CartSidebar';
 import { MobileSidebar } from './MobileSidebar';
 import { ThemeToggle } from './ThemeToggle';
+import { useWishlist } from '@/lib/wishlist-store';
+
+type SearchSuggestion = {
+  _id: string;
+  name: string;
+  slug: string;
+  featuredImage: string;
+  sellingPrice: number;
+};
 
 export function Navbar() {
   const { store, isLoading } = useStore();
   const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const pathname = usePathname();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const router = useRouter();
   const { getItemCount } = useCart();
+  const { items: wishlistItems } = useWishlist();
 
   useEffect(() => {
     if (store?._id) {
@@ -31,6 +44,35 @@ export function Navbar() {
         .catch(err => console.error(err));
     }
   }, [store?._id]);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!store?._id || query.length < 2) {
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      setIsSearching(true);
+      api.get<SearchSuggestion[]>(
+        `/stores/${store._id}/products/search/suggestions?search=${encodeURIComponent(query)}&limit=6`
+      )
+        .then((data) => setSuggestions(Array.isArray(data) ? data : []))
+        .catch(() => {
+          if (!controller.signal.aborted) setSuggestions([]);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsSearching(false);
+        });
+    }, 220);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timeout);
+    };
+  }, [searchQuery, store?._id]);
 
   if (isLoading || !store) return null;
 
@@ -60,7 +102,60 @@ export function Navbar() {
       : []
   }));
 
-  const itemCount = getItemCount();
+  const itemCount = getItemCount(store._id);
+  const wishlistCount = wishlistItems.filter((item) => item.storeId === store._id).length;
+
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    if (query) {
+      setIsSearchOpen(false);
+      router.push(`/${store.slug}/search?q=${encodeURIComponent(query)}`);
+    }
+  };
+
+  const searchSuggestions = (mobile = false) => {
+    if (searchQuery.trim().length < 2) return null;
+
+    return (
+      <div className={mobile
+        ? 'mt-4 overflow-hidden border-y border-gray-200 dark:border-white/10'
+        : 'absolute right-0 top-12 w-96 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-950'
+      }>
+        {isSearching ? (
+          <p className="px-4 py-5 text-sm text-gray-500">Finding products...</p>
+        ) : suggestions.length > 0 ? (
+          <ul>
+            {suggestions.map((product) => (
+              <li key={product._id} className="border-b border-gray-100 last:border-0 dark:border-white/10">
+                <Link
+                  href={`/${store.slug}/product/${product.slug}`}
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    setSearchQuery('');
+                  }}
+                  className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                  <img src={product.featuredImage} alt="" className="h-12 w-12 bg-gray-100 object-cover dark:bg-zinc-900" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{product.name}</span>
+                    <span className="text-xs text-gray-500">₹{product.sellingPrice.toLocaleString('en-IN')}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            <li>
+              <button type="submit" className="w-full px-4 py-3 text-left text-sm font-semibold hover:bg-gray-50 dark:hover:bg-white/5">
+                View all results for “{searchQuery.trim()}”
+              </button>
+            </li>
+          </ul>
+        ) : (
+          <p className="px-4 py-5 text-sm text-gray-500">No suggestions yet. Press Enter to search.</p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -97,23 +192,49 @@ export function Navbar() {
           </nav>
 
           {/* Icons / Utilities */}
-          <div className="flex items-center gap-4 z-50">
-            <div className="relative hidden md:block">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+          <div className="flex items-center gap-1 md:gap-4 z-50">
+            <form onSubmit={handleSearch} role="search" className="relative hidden md:block">
+              <button
+                type="submit"
+                aria-label="Submit search"
+                className="absolute inset-y-0 left-0 flex items-center pl-3 pr-2 text-gray-500 hover:text-black dark:hover:text-white"
+              >
                 <Search className="w-4 h-4 text-gray-500" />
-              </div>
+              </button>
               <input 
                 type="text" 
                 placeholder="Search" 
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                aria-label={`Search ${store.name}`}
                 className="bg-gray-100 dark:bg-white/10 border-none rounded-full py-2 pl-10 pr-4 text-sm w-40 focus:w-60 transition-all focus:ring-1 focus:ring-gray-300 dark:focus:ring-white/20"
               />
-            </div>
+              {searchSuggestions()}
+            </form>
+
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors md:hidden"
+              aria-label="Open product search"
+            >
+              <Search className="h-6 w-6" />
+            </button>
             
             <ThemeToggle />
             
-            <button className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors">
+            <Link
+              href={`/${store.slug}/wishlist`}
+              className="relative p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
+              aria-label={`Wishlist with ${wishlistCount} items`}
+            >
               <Heart className="w-6 h-6" />
-            </button>
+              {wishlistCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-xs font-semibold text-white dark:bg-white dark:text-black">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
             
             <button 
               onClick={() => setIsCartOpen(true)}
@@ -146,6 +267,28 @@ export function Navbar() {
         onClose={() => setIsMobileMenuOpen(false)} 
         categories={categories} 
       />
+
+      {isSearchOpen && (
+        <div className="fixed inset-0 z-[80] bg-white text-black dark:bg-black dark:text-white md:hidden">
+          <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-4 dark:border-white/10">
+            <form onSubmit={handleSearch} role="search" className="relative flex-1">
+              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
+              <input
+                autoFocus
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={`Search ${store.name}`}
+                className="w-full rounded-full border-0 bg-gray-100 py-3 pl-12 pr-4 text-base outline-none ring-0 dark:bg-white/10"
+              />
+              {searchSuggestions(true)}
+            </form>
+            <button type="button" onClick={() => setIsSearchOpen(false)} className="p-2" aria-label="Close search">
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

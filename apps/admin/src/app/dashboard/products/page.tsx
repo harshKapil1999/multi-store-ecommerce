@@ -143,6 +143,16 @@ export function ProductsPage() {
           >
             📦
           </Button>
+          {row.original.hasVariants && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push(`/dashboard/products/${row.original._id}/variants`)}
+              title="Manage variants"
+            >
+              🎨
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

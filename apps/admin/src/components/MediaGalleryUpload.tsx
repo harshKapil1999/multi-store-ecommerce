@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button, MediaUpload } from '@/components/index';
-import { X, Plus, Image as ImageIcon, Video } from 'lucide-react';
+import { X, Plus, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Media } from '@repo/types';
 
 interface MediaGalleryUploadProps {
@@ -12,6 +12,7 @@ interface MediaGalleryUploadProps {
 
 export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploadProps) {
   const [isAdding, setIsAdding] = useState(false);
+  const normalizeOrder = (items: Media[]) => items.map((item, index) => ({ ...item, order: index }));
 
   const handleAddMedia = (url: string) => {
     // Determine type from URL
@@ -23,12 +24,21 @@ export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploa
       order: mediaGallery.length,
     };
     // Add new media without clearing isAdding so user can add more files
-    onUpdate([...mediaGallery, newMedia]);
+    onUpdate(normalizeOrder([...mediaGallery, newMedia]));
   };
 
   const handleRemove = (index: number) => {
     const updated = mediaGallery.filter((_, i) => i !== index);
-    onUpdate(updated);
+    onUpdate(normalizeOrder(updated));
+  };
+
+  const handleMove = (index: number, direction: -1 | 1) => {
+    const destination = index + direction;
+    if (destination < 0 || destination >= mediaGallery.length) return;
+
+    const updated = [...mediaGallery];
+    [updated[index], updated[destination]] = [updated[destination], updated[index]];
+    onUpdate(normalizeOrder(updated));
   };
 
   return (
@@ -37,7 +47,7 @@ export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploa
       {mediaGallery.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
           {mediaGallery.map((media, index) => (
-            <div key={index} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
+            <div key={`${media.url}-${index}`} className="relative group aspect-square rounded-lg overflow-hidden bg-muted">
               {media.type === 'video' ? (
                 <div className="w-full h-full flex items-center justify-center bg-black">
                   <video 
@@ -60,6 +70,27 @@ export function MediaGalleryUpload({ mediaGallery, onUpdate }: MediaGalleryUploa
               >
                 <X className="w-3 h-3" />
               </button>
+              <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between opacity-0 transition-opacity group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={() => handleMove(index, -1)}
+                  disabled={index === 0}
+                  className="rounded-full bg-black/75 p-1 text-white disabled:opacity-30"
+                  aria-label={`Move media ${index + 1} earlier`}
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                </button>
+                <span className="rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-semibold text-white">{index + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => handleMove(index, 1)}
+                  disabled={index === mediaGallery.length - 1}
+                  className="rounded-full bg-black/75 p-1 text-white disabled:opacity-30"
+                  aria-label={`Move media ${index + 1} later`}
+                >
+                  <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
             </div>
           ))}
         </div>

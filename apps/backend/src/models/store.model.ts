@@ -33,6 +33,8 @@ const storeSchema = new Schema<IStore>(
       index: true,
     },
     theme: {
+      primaryColor: String,
+      secondaryColor: String,
       fontFamily: String,
     },
     navigation: [{
@@ -72,6 +74,25 @@ const storeSchema = new Schema<IStore>(
     homeBillboards: [{
       type: Schema.Types.ObjectId,
       ref: 'Billboard'
+    }],
+    homeSections: [{
+      _id: false,
+      id: { type: String, required: true },
+      type: {
+        type: String,
+        required: true,
+        enum: ['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'newsletter'],
+      },
+      title: { type: String, required: true },
+      subtitle: String,
+      isVisible: { type: Boolean, default: true },
+      order: { type: Number, default: 0 },
+      categoryIds: [String],
+      productIds: [String],
+      limit: Number,
+      layout: { type: String, enum: ['grid', 'carousel'] },
+      buttonLabel: String,
+      consentText: String,
     }],
   },
   {

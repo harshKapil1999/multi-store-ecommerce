@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useBillboards, useCreateBillboard, useDeleteBillboard } from '@/hooks/useBillboards';
-import { useCategories } from '@/hooks/useCategories';
-import { Button, Card, FormInput, MediaUpload, FormSelect } from '@/components/index';
+import { Button, Card, FormInput, MediaUpload } from '@/components/index';
 import type { Billboard, CreateBillboardInput } from '@repo/types';
 import { Plus, Trash2, GripVertical, Image as ImageIcon, Video } from 'lucide-react';
 
@@ -59,7 +58,7 @@ export function BillboardManager({ storeId }: BillboardManagerProps) {
 
   // The API returns a pagination wrapper { data: Billboard[], total, ... }
   // Extract the actual array from the wrapper
-  const billboardList = Array.isArray(billboards?.data) ? billboards.data : Array.isArray(billboards) ? billboards : [];
+  const billboardList: Billboard[] = Array.isArray(billboards?.data) ? billboards.data : Array.isArray(billboards) ? billboards : [];
 
   return (
     <Card className="p-6 space-y-6">

@@ -1,20 +1,27 @@
 'use client';
 
 import { useSelectedStore } from '@/contexts/store-context';
-import { usePages, useDeletePage, useTogglePublish } from '@/hooks/usePages';
+import { usePages, useCreatePage, useDeletePage, useTogglePublish } from '@/hooks/usePages';
 import { Card, Button } from '@/components/index';
 import Link from 'next/link';
-import { Plus, Edit, Trash2, Eye, EyeOff, Home, Loader2, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Home, Loader2, ExternalLink, Files } from 'lucide-react';
 import { useState } from 'react';
+import { useStores } from '@/hooks/useStores';
+import { PAGE_TEMPLATES } from '@/lib/page-templates';
 
 export default function PagesPage() {
   const { selectedStoreId } = useSelectedStore();
   const { data: pagesData, isLoading } = usePages(selectedStoreId || '');
+  const { data: storesData } = useStores(1, 100);
   const deletePage = useDeletePage(selectedStoreId || '');
   const togglePublish = useTogglePublish(selectedStoreId || '');
+  const createPage = useCreatePage(selectedStoreId || '');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isGeneratingLegal, setIsGeneratingLegal] = useState(false);
 
   const pages = Array.isArray(pagesData?.data) ? pagesData.data : [];
+  const stores = Array.isArray(storesData?.data) ? storesData.data : [];
+  const selectedStore = stores.find((store: any) => store._id === selectedStoreId);
 
   const handleDelete = async (pageId: string) => {
     if (!window.confirm('Are you sure you want to delete this page?')) return;
@@ -28,6 +35,30 @@ export default function PagesPage() {
 
   const handleTogglePublish = async (pageId: string) => {
     await togglePublish.mutateAsync(pageId);
+  };
+
+  const generateLegalPages = async () => {
+    if (!selectedStoreId) return;
+    setIsGeneratingLegal(true);
+    try {
+      const existingSlugs = new Set(pages.map((page: any) => page.slug));
+      for (const template of Object.values(PAGE_TEMPLATES)) {
+        if (existingSlugs.has(template.slug)) continue;
+        await createPage.mutateAsync({
+          title: template.title,
+          slug: template.slug,
+          description: template.description,
+          metaTitle: template.title,
+          metaDescription: template.description,
+          isPublished: false,
+          sections: [{ type: 'text_content', title: template.title, content: template.content, order: 0, isVisible: true }],
+        });
+      }
+    } catch {
+      // Individual create mutations already show the backend error message.
+    } finally {
+      setIsGeneratingLegal(false);
+    }
   };
 
   if (!selectedStoreId) {
@@ -50,12 +81,18 @@ export default function PagesPage() {
             Create and manage dynamic pages for your store
           </p>
         </div>
-        <Link href={`/dashboard/pages/new`}>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Page
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={generateLegalPages} disabled={isGeneratingLegal}>
+            {isGeneratingLegal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Files className="mr-2 h-4 w-4" />}
+            Generate Legal Drafts
           </Button>
-        </Link>
+          <Link href={`/dashboard/pages/new`}>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Page
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {isLoading ? (
@@ -138,9 +175,10 @@ export default function PagesPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => {
+                            const storefrontUrl = (process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
                             const pageUrl = page.isHomePage 
-                              ? `${window.location.origin}/stores/${selectedStoreId}`
-                              : `${window.location.origin}/stores/${selectedStoreId}/${page.slug}`;
+                              ? `${storefrontUrl}/${selectedStore?.slug || ''}`
+                              : `${storefrontUrl}/${selectedStore?.slug || ''}/${page.slug}`;
                             window.open(pageUrl, '_blank', 'noopener,noreferrer');
                           }}
                           title="View page"

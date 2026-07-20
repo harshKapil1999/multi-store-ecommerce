@@ -14,7 +14,7 @@ export class PaymentService {
     }) {
         try {
             const order = await getRazorpayInstance().orders.create({
-                amount: params.amount * 100, // Convert to paise
+                amount: Math.round(params.amount * 100), // Convert to paise
                 currency: params.currency || 'INR',
                 receipt: params.receipt,
                 notes: params.notes,
@@ -42,7 +42,10 @@ export class PaymentService {
                 .update(`${orderId}|${paymentId}`)
                 .digest('hex');
 
-            return generatedSignature === signature;
+            const generatedBuffer = Buffer.from(generatedSignature, 'hex');
+            const receivedBuffer = Buffer.from(signature, 'hex');
+
+            return generatedBuffer.length === receivedBuffer.length && crypto.timingSafeEqual(generatedBuffer, receivedBuffer);
         } catch (error) {
             return false;
         }
@@ -66,7 +69,7 @@ export class PaymentService {
     static async createRefund(paymentId: string, amount?: number) {
         try {
             const refund = await getRazorpayInstance().payments.refund(paymentId, {
-                amount: amount ? amount * 100 : undefined, // Convert to paise if provided
+                amount: amount ? Math.round(amount * 100) : undefined, // Convert to paise if provided
             });
             return refund;
         } catch (error: any) {

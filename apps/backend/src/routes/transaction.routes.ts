@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as transactionController from '../controllers/transaction.controller';
 import { authenticate, authorize } from '../middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 // All routes protected
 router.use(authenticate);

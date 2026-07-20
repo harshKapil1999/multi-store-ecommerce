@@ -1,13 +1,13 @@
 'use client';
 
 import { useSelectedStore } from '@/contexts/store-context';
-import { usePage, useUpdatePage, useAddSection, useDeleteSection, useReorderSections } from '@/hooks/usePages';
+import { usePage, useUpdatePage, useAddSection, useUpdateSection, useDeleteSection, useReorderSections } from '@/hooks/usePages';
 import { useBillboards } from '@/hooks/useBillboards';
 import { useProducts } from '@/hooks/useProducts';
 import { useCategories } from '@/hooks/useCategories';
-import { Card, Button } from '@/components/index';
+import { Card, Button, Checkbox, Input, Textarea } from '@/components/index';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   ArrowLeft, 
   Plus, 
@@ -16,9 +16,13 @@ import {
   Eye, 
   EyeOff,
   Save,
-  Loader2
+  Loader2,
+  ArrowUp,
+  ArrowDown,
+  Pencil
 } from 'lucide-react';
 import type { PageSection, SectionType, AddPageSectionInput } from '@repo/types';
+import { RichTextEditor } from '@/components/RichTextEditor';
 
 export default function PageEditorPage() {
   const params = useParams();
@@ -33,6 +37,7 @@ export default function PageEditorPage() {
   
   const updatePage = useUpdatePage(selectedStoreId || '', pageId);
   const addSection = useAddSection(selectedStoreId || '', pageId);
+  const updateSection = useUpdateSection(selectedStoreId || '', pageId);
   const deleteSection = useDeleteSection(selectedStoreId || '', pageId);
   const reorderSections = useReorderSections(selectedStoreId || '', pageId);
 
@@ -42,6 +47,8 @@ export default function PageEditorPage() {
   const [isHomePage, setIsHomePage] = useState(false);
   const [showAddSection, setShowAddSection] = useState(false);
   const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [sectionTitle, setSectionTitle] = useState('');
+  const [sectionContent, setSectionContent] = useState('');
 
   const page = pageData?.data;
   const billboards = Array.isArray(billboardsData?.data) ? billboardsData.data : [];
@@ -49,14 +56,14 @@ export default function PageEditorPage() {
   const categories = Array.isArray(categoriesData?.data?.data) ? categoriesData.data.data : [];
 
   // Initialize form when page data loads
-  useState(() => {
+  useEffect(() => {
     if (page) {
       setPageTitle(page.title);
       setPageSlug(page.slug);
       setPageDescription(page.description || '');
       setIsHomePage(page.isHomePage);
     }
-  });
+  }, [page]);
 
   const handleSavePageInfo = async () => {
     await updatePage.mutateAsync({
@@ -75,6 +82,35 @@ export default function PageEditorPage() {
   const handleDeleteSection = async (sectionId: string) => {
     if (!window.confirm('Are you sure you want to delete this section?')) return;
     await deleteSection.mutateAsync(sectionId);
+  };
+
+  const handleMoveSection = async (sectionId: string, direction: -1 | 1) => {
+    const ids = [...(page.sections || [])]
+      .sort((a: PageSection, b: PageSection) => a.order - b.order)
+      .map((section: PageSection) => section._id);
+    const index = ids.indexOf(sectionId);
+    const destination = index + direction;
+    if (index < 0 || destination < 0 || destination >= ids.length) return;
+    [ids[index], ids[destination]] = [ids[destination], ids[index]];
+    await reorderSections.mutateAsync(ids);
+  };
+
+  const openSectionEditor = (section: PageSection) => {
+    setEditingSection(section._id);
+    setSectionTitle(section.title || '');
+    setSectionContent(section.content || section.html || '');
+  };
+
+  const saveSection = async () => {
+    if (!editingSection) return;
+    const section = page.sections.find((item: PageSection) => item._id === editingSection);
+    if (!section) return;
+    await updateSection.mutateAsync({
+      sectionId: editingSection,
+      title: sectionTitle,
+      ...(section.type === 'custom_html' ? { html: sectionContent } : { content: sectionContent }),
+    });
+    setEditingSection(null);
   };
 
   if (!selectedStoreId) {
@@ -128,41 +164,36 @@ export default function PageEditorPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Title</label>
-            <input
+            <Input
               type="text"
               value={pageTitle}
               onChange={(e) => setPageTitle(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
               placeholder="Page title"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Slug</label>
-            <input
+            <Input
               type="text"
               value={pageSlug}
               onChange={(e) => setPageSlug(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
               placeholder="page-slug"
             />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Description</label>
-            <textarea
+            <Textarea
               value={pageDescription}
               onChange={(e) => setPageDescription(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
               rows={3}
               placeholder="Page description"
             />
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
+            <Checkbox
               id="isHomePage"
               checked={isHomePage}
-              onChange={(e) => setIsHomePage(e.target.checked)}
-              className="rounded"
+              onCheckedChange={(checked) => setIsHomePage(checked === true)}
             />
             <label htmlFor="isHomePage" className="text-sm font-medium">
               Set as Home Page
@@ -195,11 +226,14 @@ export default function PageEditorPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {page.sections?.map((section: PageSection) => (
-              <div key={section._id} className="border rounded-lg p-4 bg-white">
+            {[...(page.sections || [])].sort((a: PageSection, b: PageSection) => a.order - b.order).map((section: PageSection, sectionIndex: number) => (
+              <div key={section._id} className="border rounded-lg p-4 bg-background">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3 flex-1">
-                    <GripVertical className="h-5 w-5 text-gray-400 mt-1 cursor-move" />
+                    <div className="mt-1 flex flex-col">
+                      <button type="button" onClick={() => handleMoveSection(section._id, -1)} disabled={sectionIndex === 0} className="rounded p-1 hover:bg-muted disabled:opacity-25" aria-label="Move section up"><ArrowUp className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => handleMoveSection(section._id, 1)} disabled={sectionIndex === page.sections.length - 1} className="rounded p-1 hover:bg-muted disabled:opacity-25" aria-label="Move section down"><ArrowDown className="h-4 w-4" /></button>
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium">{section.title || 'Untitled Section'}</span>
@@ -229,7 +263,17 @@ export default function PageEditorPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm">
+                    {(section.type === 'text_content' || section.type === 'custom_html') && (
+                      <Button variant="ghost" size="sm" onClick={() => openSectionEditor(section)} title="Edit section content">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => updateSection.mutate({ sectionId: section._id, isVisible: !section.isVisible })}
+                      title={section.isVisible ? 'Hide section' : 'Show section'}
+                    >
                       {section.isVisible ? (
                         <Eye className="h-4 w-4" />
                       ) : (
@@ -283,6 +327,28 @@ export default function PageEditorPage() {
               <Button variant="outline" onClick={() => setShowAddSection(false)} className="w-full">
                 Cancel
               </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {editingSection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <Card className="max-h-[90vh] w-full max-w-4xl overflow-y-auto p-6">
+            <div className="mb-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold">Edit Section</h3>
+                <p className="text-sm text-muted-foreground">Only published and visible sections appear in the storefront.</p>
+              </div>
+              <Button variant="ghost" onClick={() => setEditingSection(null)}>Close</Button>
+            </div>
+            <label className="mb-2 block text-sm font-medium">Section title</label>
+            <Input value={sectionTitle} onChange={(event) => setSectionTitle(event.target.value)} className="mb-5" />
+            <label className="mb-2 block text-sm font-medium">Content</label>
+            <RichTextEditor value={sectionContent} onChange={setSectionContent} minHeight={340} />
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingSection(null)}>Cancel</Button>
+              <Button onClick={saveSection} disabled={updateSection.isPending}>{updateSection.isPending ? 'Saving...' : 'Save Section'}</Button>
             </div>
           </Card>
         </div>

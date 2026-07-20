@@ -114,6 +114,11 @@ const productSchema = new Schema<IProduct>(
       default: false,
       index: true,
     },
+    sku: {
+      type: String,
+      required: false, // Optional because variant products use variant SKUs
+      trim: true,
+    },
     isActive: {
       type: Boolean,
       default: true,

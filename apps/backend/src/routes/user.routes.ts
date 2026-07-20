@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import * as userController from '../controllers/user.controller';
 import { authenticate } from '../middleware/auth';
+import { authRateLimit } from '../middleware/rate-limit';
 
-const router = Router();
+const router: Router = Router();
 
 // Public routes
 router.post(
@@ -13,14 +14,19 @@ router.post(
     body('password').isLength({ min: 6 }),
     body('name').notEmpty().trim(),
   ],
+  authRateLimit,
   userController.register
 );
 
 router.post(
   '/login',
   [body('email').isEmail().normalizeEmail(), body('password').notEmpty()],
+  authRateLimit,
   userController.login
 );
+
+router.post('/send-otp', authRateLimit, userController.sendOtp);
+router.post('/verify-otp', authRateLimit, userController.verifyOtp);
 
 // Protected routes
 router.get('/me', authenticate, userController.getCurrentUser);

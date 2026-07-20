@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { loginAction } from '@/lib/actions/auth';
-import { Button, Card, FormInput } from '@/components/index';
-import { AlertCircle, Loader2, Sparkles, LayoutDashboard } from 'lucide-react';
+import { Button, Card } from '@/components/index';
+import { AlertCircle, Loader2, LayoutDashboard, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signInAdminWithEmail, signInAdminWithGoogle } from '@/lib/firebase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,7 +16,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const createAdminSession = async (idToken: string) => {
+    const response = await fetch('/api/auth/firebase', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ idToken }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.message || 'Firebase session exchange failed');
+    }
+
+    return payload.data.user;
+  };
+
+  const finishFirebaseSignIn = async (credential: Awaited<ReturnType<typeof signInAdminWithEmail>>) => {
+    const idToken = await credential.user.getIdToken();
+    const user = await createAdminSession(idToken);
+    setUser(user);
+    router.push('/dashboard');
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -27,13 +53,23 @@ export default function LoginPage() {
 
     startTransition(async () => {
       try {
-        const result = await loginAction(email, password);
-        if (result.success && result.user) {
-          setUser(result.user);
-          router.push('/dashboard');
-        }
+        const credential = await signInAdminWithEmail(email, password);
+        await finishFirebaseSignIn(credential);
       } catch (err: any) {
         setError(err.message || 'Login failed. Please try again.');
+      }
+    });
+  };
+
+  const handleGoogleSignIn = () => {
+    setError('');
+
+    startTransition(async () => {
+      try {
+        const credential = await signInAdminWithGoogle();
+        await finishFirebaseSignIn(credential);
+      } catch (err: any) {
+        setError(err.message || 'Google sign-in failed. Please try again.');
       }
     });
   };
@@ -60,7 +96,7 @@ export default function LoginPage() {
         </div>
 
         <Card className="p-8 bg-neutral-900/50 border-neutral-800 backdrop-blur-md shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-6">
             {error && (
               <div className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                 <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
@@ -68,6 +104,35 @@ export default function LoginPage() {
               </div>
             )}
 
+            <Button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isPending}
+              className="w-full bg-white hover:bg-neutral-200 text-black font-semibold py-2.5 rounded-lg transition-all duration-200 shadow-lg shadow-white/5 active:scale-[0.98]"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Authenticating...
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Continue with Google
+                </>
+              )}
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-neutral-800" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-neutral-900 px-2 text-neutral-500">or use email and password</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleEmailSubmit} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-neutral-300 ml-1">Email Address</label>
@@ -108,12 +173,13 @@ export default function LoginPage() {
                 'Sign In to Dashboard'
               )}
             </Button>
-          </form>
+            </form>
+          </div>
 
           <div className="mt-8 pt-6 border-t border-neutral-800">
              <div className="flex justify-between items-center text-xs text-neutral-500">
-                <span>Demo Access:</span>
-                <span className="font-mono text-neutral-400 bg-neutral-950 px-2 py-1 rounded border border-neutral-800">admin@example.com / password</span>
+                <span>Auth provider:</span>
+                <span className="font-mono text-neutral-400 bg-neutral-950 px-2 py-1 rounded border border-neutral-800">Firebase Authentication</span>
              </div>
           </div>
         </Card>

@@ -117,11 +117,11 @@ export default function OrderDetailPage({
                       <p className="text-xs text-muted-foreground">SKU: {item.sku}</p>
                     )}
                     <p className="text-sm text-muted-foreground">
-                      ${item.price.toFixed(2)} × {item.quantity}
+                      ₹{item.price.toLocaleString('en-IN')} × {item.quantity}
                     </p>
                   </div>
                   <p className="font-semibold">
-                    ${item.total.toFixed(2)}
+                    ₹{item.total.toLocaleString('en-IN')}
                   </p>
                 </div>
               ))}
@@ -208,6 +208,10 @@ export default function OrderDetailPage({
                 <span className="text-muted-foreground">Method:</span>
                 <span className="font-medium capitalize">{order.paymentMethod}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Transaction:</span>
+                <span className="font-mono text-xs">{order.transactionId || '-'}</span>
+              </div>
             </div>
           </Card>
 
@@ -217,19 +221,19 @@ export default function OrderDetailPage({
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal:</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Tax:</span>
-                <span>${order.tax.toFixed(2)}</span>
+                <span>₹{order.tax.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shipping:</span>
-                <span>${order.shipping.toFixed(2)}</span>
+                <span>₹{order.shipping.toLocaleString('en-IN')}</span>
               </div>
               <div className="border-t pt-2 flex justify-between font-semibold text-base">
                 <span>Total:</span>
-                <span>${order.total.toFixed(2)}</span>
+                <span>₹{order.total.toLocaleString('en-IN')}</span>
               </div>
             </div>
           </Card>

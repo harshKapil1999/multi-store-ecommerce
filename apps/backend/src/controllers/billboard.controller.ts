@@ -41,7 +41,8 @@ export const listBillboards = async (req: AuthRequest, res: Response, next: Next
 export const getBillboardById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const billboard = await Billboard.findById(id);
+    const { storeId } = req.params;
+    const billboard = await Billboard.findOne({ _id: id, storeId });
 
     if (!billboard) {
       throw new AppError('Billboard not found', 404);
@@ -75,10 +76,10 @@ export const createBillboard = async (req: AuthRequest, res: Response, next: Nex
 
 export const updateBillboard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const { id, storeId } = req.params;
     const input = req.body as UpdateBillboardInput;
 
-    const billboard = await Billboard.findById(id);
+    const billboard = await Billboard.findOne({ _id: id, storeId });
     if (!billboard) {
       throw new AppError('Billboard not found', 404);
     }
@@ -94,9 +95,9 @@ export const updateBillboard = async (req: AuthRequest, res: Response, next: Nex
 
 export const deleteBillboard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const { id, storeId } = req.params;
 
-    const billboard = await Billboard.findById(id);
+    const billboard = await Billboard.findOne({ _id: id, storeId });
     if (!billboard) {
       throw new AppError('Billboard not found', 404);
     }
@@ -121,7 +122,7 @@ export const reorderBillboards = async (
     // Update all billboards in the order specified
     await Promise.all(
       billboards.map((item: { id: string; order: number }) =>
-        Billboard.findByIdAndUpdate(item.id, { order: item.order }, { new: true })
+        Billboard.findOneAndUpdate({ _id: item.id, storeId }, { order: item.order }, { new: true })
       )
     );
 

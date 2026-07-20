@@ -53,6 +53,10 @@ const orderSchema = new Schema<IOrder>(
           required: true,
         },
         image: String,
+        selectedAttributes: {
+          type: Map,
+          of: String,
+        },
       },
     ],
     subtotal: {

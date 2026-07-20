@@ -18,11 +18,7 @@ export const usePages = (storeId: string, published?: boolean) => {
   return useQuery({
     queryKey: [...PAGES_QUERY_KEY, storeId, { published }],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (published !== undefined) {
-        params.append('published', String(published));
-      }
-      const { data } = await apiClient.get(`/stores/${storeId}/pages?${params}`);
+      const { data } = await apiClient.get(`/stores/${storeId}/pages/admin`);
       return data.data;
     },
     enabled: !!storeId,

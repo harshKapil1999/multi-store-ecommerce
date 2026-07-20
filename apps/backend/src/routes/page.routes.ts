@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as pageController from '../controllers/page.controller';
 import { authenticate } from '../middleware/auth';
+import { authorize } from '../middleware/auth';
+import { requireStoreAccess } from '../middleware/store-context';
 
-const router = Router();
+const router: Router = Router({ mergeParams: true });
 
 // All page routes are scoped to a store
 // Routes: /api/v1/stores/:storeId/pages
@@ -13,6 +15,8 @@ const router = Router();
  * @access  Public (with optional filter for published)
  */
 router.get('/', pageController.getPages);
+
+router.get('/admin', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.getAdminPages);
 
 /**
  * @route   GET /api/v1/stores/:storeId/pages/home
@@ -33,62 +37,62 @@ router.get('/slug/:slug', pageController.getPageBySlug);
  * @desc    Get a single page
  * @access  Public
  */
-router.get('/:pageId', pageController.getPage);
+router.get('/:pageId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.getPage);
 
 /**
  * @route   POST /api/v1/stores/:storeId/pages
  * @desc    Create a new page
  * @access  Private (requires authentication)
  */
-router.post('/', authenticate, pageController.createPage);
+router.post('/', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.createPage);
 
 /**
  * @route   PUT /api/v1/stores/:storeId/pages/:pageId
  * @desc    Update a page
  * @access  Private
  */
-router.put('/:pageId', authenticate, pageController.updatePage);
+router.put('/:pageId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.updatePage);
 
 /**
  * @route   DELETE /api/v1/stores/:storeId/pages/:pageId
  * @desc    Delete a page
  * @access  Private
  */
-router.delete('/:pageId', authenticate, pageController.deletePage);
+router.delete('/:pageId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.deletePage);
 
 /**
  * @route   PATCH /api/v1/stores/:storeId/pages/:pageId/publish
  * @desc    Toggle page publish status
  * @access  Private
  */
-router.patch('/:pageId/publish', authenticate, pageController.togglePublish);
+router.patch('/:pageId/publish', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.togglePublish);
 
 /**
  * @route   POST /api/v1/stores/:storeId/pages/:pageId/sections
  * @desc    Add a section to a page
  * @access  Private
  */
-router.post('/:pageId/sections', authenticate, pageController.addSection);
+router.post('/:pageId/sections', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.addSection);
 
 /**
  * @route   PUT /api/v1/stores/:storeId/pages/:pageId/sections/:sectionId
  * @desc    Update a section
  * @access  Private
  */
-router.put('/:pageId/sections/:sectionId', authenticate, pageController.updateSection);
+router.put('/:pageId/sections/:sectionId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.updateSection);
 
 /**
  * @route   DELETE /api/v1/stores/:storeId/pages/:pageId/sections/:sectionId
  * @desc    Delete a section
  * @access  Private
  */
-router.delete('/:pageId/sections/:sectionId', authenticate, pageController.deleteSection);
+router.delete('/:pageId/sections/:sectionId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.deleteSection);
 
 /**
  * @route   POST /api/v1/stores/:storeId/pages/:pageId/sections/reorder
  * @desc    Reorder sections
  * @access  Private
  */
-router.post('/:pageId/sections/reorder', authenticate, pageController.reorderSections);
+router.post('/:pageId/sections/reorder', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.reorderSections);
 
 export default router;

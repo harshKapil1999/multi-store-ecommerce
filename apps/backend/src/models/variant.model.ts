@@ -26,6 +26,11 @@ const productVariantSchema = new Schema<IProductVariant>(
             required: true,
             min: 0,
         },
+        compareAtPrice: {
+            type: Number,
+            min: 0,
+            default: 0, // MRP / original price for showing discounts
+        },
         stock: {
             type: Number,
             required: true,
@@ -35,6 +40,11 @@ const productVariantSchema = new Schema<IProductVariant>(
         images: {
             type: [String],
             default: [],
+        },
+        featuredImageIndex: {
+            type: Number,
+            default: 0, // Index of the featured image in images array
+            min: 0,
         },
         attributes: {
             type: Map,

@@ -27,9 +27,10 @@ export const useProducts = (storeId: string, filters?: Partial<ProductFilters>) 
         ...(filters?.minPrice && { minPrice: String(filters.minPrice) }),
         ...(filters?.maxPrice && { maxPrice: String(filters.maxPrice) }),
         ...(filters?.isFeatured !== undefined && { isFeatured: String(filters.isFeatured) }),
-        ...(filters?.sortBy && { sortBy: filters.sortBy }),
-        ...(filters?.sortOrder && { sortOrder: filters.sortOrder }),
-      });
+	        ...(filters?.sortBy && { sortBy: filters.sortBy }),
+	        ...(filters?.sortOrder && { sortOrder: filters.sortOrder }),
+	        includeInactive: 'true',
+	      });
       const { data } = await apiClient.get(
         `/stores/${storeId}/products?${params}`
       );

@@ -8,6 +8,7 @@ import {
   UpdateProductInput,
   UpdateStockInput,
 } from '../validators/billboard-category-product.schema';
+import { searchProducts } from '../services/product-search.service';
 
 export const listProducts = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -20,6 +21,7 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       minPrice,
       maxPrice,
       isFeatured,
+      includeInactive,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = req.query;
@@ -45,8 +47,8 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       query.categoryId = { $in: categoryIds };
     }
 
-    if (search) query.$text = { $search: search as string };
     if (isFeatured === 'true') query.isFeatured = true;
+    if (String(includeInactive) !== 'true') query.isActive = true;
 
     if (minPrice || maxPrice) {
       query.sellingPrice = {};
@@ -54,12 +56,28 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       if (maxPrice) query.sellingPrice.$lte = Number(maxPrice);
     }
 
-    const sort: Record<string, 1 | -1> = {};
-    sort[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+    if (search) {
+      const rankedProducts = await searchProducts(query, search);
+      const currentPage = Number(page);
+      const pageSize = Math.min(Number(limit), 100);
+      const total = rankedProducts.length;
+
+      res.json({
+        success: true,
+        data: {
+          data: rankedProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+          total,
+          page: currentPage,
+          limit: pageSize,
+          totalPages: Math.ceil(total / pageSize),
+        },
+      });
+      return;
+    }
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .sort(sort)
+        .sort({ [sortBy as string]: sortOrder === 'asc' ? 1 : -1 })
         .limit(Number(limit))
         .skip((Number(page) - 1) * Number(limit)),
       Product.countDocuments(query),
@@ -80,11 +98,41 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
+export const getSearchSuggestions = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { storeId } = req.params;
+    const search = String(req.query.search ?? '').trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 6, 1), 10);
+
+    if (search.length < 2) {
+      res.json({ success: true, data: [] });
+      return;
+    }
+
+    const matches = await searchProducts({ storeId, isActive: true }, search);
+    const suggestions = matches.slice(0, limit).map((product) => ({
+      _id: product._id,
+      name: product.name,
+      slug: product.slug,
+      featuredImage: product.featuredImage,
+      sellingPrice: product.sellingPrice,
+    }));
+
+    res.json({ success: true, data: suggestions });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getProductById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { id } = req.params;
+    const { id, storeId } = req.params;
 
-    const product = await Product.findById(id);
+    const product = await Product.findOne({ _id: id, storeId });
     if (!product) {
       throw new AppError('Product not found', 404);
     }
@@ -138,6 +186,11 @@ export const createProduct = async (req: AuthRequest, res: Response, next: NextF
     const { storeId } = req.params;
     const input = req.body as CreateProductInput;
 
+    const category = await Category.findOne({ _id: input.categoryId, storeId }).select('_id').lean();
+    if (!category) {
+      throw new AppError('Category does not belong to this store', 400);
+    }
+
     // Check slug uniqueness within store
     const existing = await Product.findOne({ storeId, slug: input.slug });
     if (existing) {
@@ -160,7 +213,7 @@ export const updateProduct = async (req: AuthRequest, res: Response, next: NextF
     const { id, storeId } = req.params;
     const input = req.body as UpdateProductInput;
 
-    const product = await Product.findById(id);
+    const product = await Product.findOne({ _id: id, storeId });
     if (!product) {
       throw new AppError('Product not found', 404);
     }
@@ -190,7 +243,7 @@ export const updateStock = async (req: AuthRequest, res: Response, next: NextFun
     const { id, storeId } = req.params;
     const input = req.body as UpdateStockInput;
 
-    const product = await Product.findById(id);
+    const product = await Product.findOne({ _id: id, storeId });
     if (!product) {
       throw new AppError('Product not found', 404);
     }
@@ -215,7 +268,7 @@ export const deleteProduct = async (req: AuthRequest, res: Response, next: NextF
   try {
     const { id, storeId } = req.params;
 
-    const product = await Product.findById(id);
+    const product = await Product.findOne({ _id: id, storeId });
     if (!product) {
       throw new AppError('Product not found', 404);
     }

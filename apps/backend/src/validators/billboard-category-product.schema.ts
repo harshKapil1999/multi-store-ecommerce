@@ -87,6 +87,12 @@ export const createProductSchema = z.object({
   isFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
   stock: z.number().int().nonnegative().optional(),
+  sku: z.string().optional(), // Optional for variant products
+  hasVariants: z.boolean().optional(),
+  variantOptions: z.array(z.object({
+    name: z.string().min(1),
+    values: z.array(z.string().min(1)).min(1),
+  })).optional(),
 });
 
 export const updateProductSchema = createProductSchema.partial();
@@ -103,6 +109,7 @@ export const listProductsQuerySchema = z.object({
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
   isFeatured: z.coerce.boolean().optional(),
+  includeInactive: z.coerce.boolean().optional(),
   sortBy: z.enum(['createdAt', 'name', 'sellingPrice']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });

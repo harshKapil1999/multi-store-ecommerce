@@ -35,18 +35,6 @@ export const StoreProvider: React.FC<StoreProviderProps> = ({ children, slug }) 
     const fetchStoreData = async () => {
       try {
         setIsLoading(true);
-        // 1. Fetch Store Details
-        // This assumes a new endpoint or using existing one filtering by slug
-        // For now, let's mock the endpoint or assume it exists
-        // Since backend doesn't have public getStoreBySlug in routes yet (only protected or by ID),
-        // we might need to add it or use what we have. 
-        // NOTE: The implementation plan didn't explicitly add public getStoreBySlug. 
-        // I will assume /stores/slug/:slug exists (common pattern) or I might need to add it.
-        // Actually, backend store.routes.ts likely has it. Checked earlier: only ID based.
-        // Wait, I should add getStoreBySlug to backend if it's missing.
-        // Let's assume for now I'll fix backend if this fails.
-        
-        // TODO: Replace with actual endpoint
         const storeData = await api.get<Store>(`/stores/slug/${slug}`);
         setStore(storeData);
 

@@ -17,7 +17,7 @@ export const useStores = (page = 1, limit = 20, search?: string) => {
         limit: String(limit),
         ...(search && { search }),
       });
-      const { data } = await apiClient.get(`/stores?${params}`);
+      const { data } = await apiClient.get(`/stores/admin?${params}`);
       return data.data;
     },
     retry: 1,
@@ -32,7 +32,7 @@ export const useStore = (id: string) => {
   return useQuery({
     queryKey: [...STORES_QUERY_KEY, id],
     queryFn: async () => {
-      const { data } = await apiClient.get(`/stores/${id}`);
+      const { data } = await apiClient.get(`/stores/admin/${id}`);
       return data;
     },
     enabled: !!id,

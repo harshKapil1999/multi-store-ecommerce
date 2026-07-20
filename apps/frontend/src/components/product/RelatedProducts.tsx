@@ -5,14 +5,15 @@ import { ProductSpotlight } from '@/components/home/ProductSpotlight';
 
 interface RelatedProductsProps {
   products: Product[];
+  storeSlug: string;
 }
 
-export function RelatedProducts({ products }: RelatedProductsProps) {
+export function RelatedProducts({ products, storeSlug }: RelatedProductsProps) {
   if (!products || products.length === 0) return null;
 
   return (
      <div className="border-t border-gray-100 dark:border-white/10 pt-12 mt-12">
-        <ProductSpotlight title="You Might Also Like" products={products} />
+        <ProductSpotlight title="You Might Also Like" products={products} storeSlug={storeSlug} />
      </div>
   );
 }

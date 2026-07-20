@@ -3,8 +3,9 @@ import * as categoryController from '../controllers/category.controller';
 import { authenticate, authorize } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createCategorySchema, updateCategorySchema } from '../validators/billboard-category-product.schema';
+import { requireStoreAccess } from '../middleware/store-context';
 
-const router = Router({ mergeParams: true });
+const router: Router = Router({ mergeParams: true });
 
 // Public routes
 router.get('/', categoryController.listCategories);
@@ -18,6 +19,7 @@ router.post(
   '/',
   authenticate,
   authorize('admin', 'store_owner'),
+  requireStoreAccess,
   validate(createCategorySchema),
   categoryController.createCategory
 );
@@ -26,6 +28,7 @@ router.put(
   '/:id',
   authenticate,
   authorize('admin', 'store_owner'),
+  requireStoreAccess,
   validate(updateCategorySchema),
   categoryController.updateCategory
 );
@@ -34,6 +37,7 @@ router.delete(
   '/:id',
   authenticate,
   authorize('admin', 'store_owner'),
+  requireStoreAccess,
   categoryController.deleteCategory
 );
 

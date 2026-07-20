@@ -6,36 +6,23 @@ import { CategoryWithChildren } from '@repo/types';
 interface FeaturedCategoriesProps {
   categories: CategoryWithChildren[];
   storeSlug: string;
+  title?: string;
+  subtitle?: string;
 }
 
-export function FeaturedCategories({ categories, storeSlug }: FeaturedCategoriesProps) {
+export function FeaturedCategories({ categories, storeSlug, title = 'Featured', subtitle }: FeaturedCategoriesProps) {
   if (!categories || categories.length === 0) return null;
-
-  // Recursively collect all featured categories from the tree
-  const getAllFeatured = (cats: CategoryWithChildren[]): CategoryWithChildren[] => {
-    let result: CategoryWithChildren[] = [];
-    cats.forEach(cat => {
-      if (cat.isFeatured) {
-        result.push(cat);
-      }
-      if (cat.children && cat.children.length > 0) {
-        result = result.concat(getAllFeatured(cat.children));
-      }
-    });
-    return result;
-  };
-  
-  const toShow = getAllFeatured(categories);
 
   return (
     <section className="py-20 bg-white dark:bg-black">
       <div className="container mx-auto px-4 md:px-8">
-        <h2 className="text-3xl font-bold mb-10 text-gray-900 dark:text-white font-sans tracking-tight">
-          Featured
-        </h2>
+        <div className="mb-10">
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white font-sans tracking-tight">{title}</h2>
+          {subtitle && <p className="mt-2 max-w-2xl text-gray-500 dark:text-gray-400">{subtitle}</p>}
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {toShow.map((category) => (
+          {categories.map((category) => (
             <Link 
               key={category._id} 
               href={`/${storeSlug}/category/${category.slug}`}
@@ -43,11 +30,13 @@ export function FeaturedCategories({ categories, storeSlug }: FeaturedCategories
             >
               {/* Image */}
               <div className="absolute inset-0">
-                <img 
-                  src={category.imageUrl || '/placeholder-category.jpg'} 
-                  alt={category.name}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
+                {category.imageUrl && (
+                  <img
+                    src={category.imageUrl}
+                    alt={category.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                )}
               </div>
               
               {/* Overlay Content - Bottom Left */}

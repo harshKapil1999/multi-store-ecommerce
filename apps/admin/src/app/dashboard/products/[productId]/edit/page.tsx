@@ -55,10 +55,17 @@ export default function EditProductPage({ params }: { params: Promise<{ productI
             <ArrowLeft className="h-5 w-5" />
           </button>
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight">Edit Product</h1>
           <p className="text-muted-foreground">Update {product.name}</p>
         </div>
+        {product.hasVariants && (
+          <Link href={`/dashboard/products/${productId}/variants`}>
+            <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+              Manage Variants
+            </button>
+          </Link>
+        )}
       </div>
 
       <ProductForm

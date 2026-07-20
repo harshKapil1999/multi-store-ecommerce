@@ -77,7 +77,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
          categoryName={categoryName} 
        />
        
-       <RelatedProducts products={relatedProducts} />
+       <RelatedProducts products={relatedProducts} storeSlug={storeSlug} />
     </div>
   );
 }

@@ -33,13 +33,13 @@ export default function Dashboard() {
   const productsList = Array.isArray(products?.data) ? products.data : [];
   
   // Orders and Transactions processing
-  const ordersList = Array.isArray(ordersData?.data) ? ordersData.data : (Array.isArray(ordersData) ? ordersData : []);
-  const transactionsList = Array.isArray(transactionsData) ? transactionsData : []; 
+  const ordersList = Array.isArray(ordersData?.data) ? ordersData.data : [];
+  const transactionsList = Array.isArray(transactionsData) ? transactionsData : [];
 
   const orderCount = ordersList.length; // Approximate if not paginated fully, or use pagination total if available
   const totalRevenue = transactionsList
     .filter((t: any) => t.status === 'captured')
-    .reduce((acc: number, t: any) => acc + t.amount, 0) / 100;
+    .reduce((acc: number, t: any) => acc + t.amount, 0);
 
   // Show error state if any critical data fetch fails
   if (storesError || (productsError && selectedStoreId) || (categoriesError && selectedStoreId)) {
@@ -264,9 +264,9 @@ export default function Dashboard() {
                         <tbody className="divide-y divide-border/50">
                             {ordersList.slice(0, 5).map((order: any) => (
                                 <tr key={order._id} className="hover:bg-muted/30">
-                                    <td className="px-4 py-3 font-mono text-xs">{order._id.substring(0, 8)}...</td>
+                                <td className="px-4 py-3 font-mono text-xs">{order.orderNumber || `${order._id.substring(0, 8)}...`}</td>
                                     <td className="px-4 py-3 capitalize">{order.status}</td>
-                                    <td className="px-4 py-3 text-right">₹{order.totalAmount}</td>
+                                <td className="px-4 py-3 text-right">₹{order.total?.toLocaleString('en-IN') || 0}</td>
                                 </tr>
                             ))}
                             {ordersList.length === 0 && (
@@ -304,7 +304,7 @@ export default function Dashboard() {
                                 <tr key={t._id} className="hover:bg-muted/30">
                                     <td className="px-4 py-3 font-mono text-xs">{t.razorpayPaymentId?.substring(0, 10) || '-'}</td>
                                     <td className="px-4 py-3 capitalize">{t.status}</td>
-                                    <td className="px-4 py-3 text-right">₹{(t.amount / 100).toLocaleString('en-IN')}</td>
+                                <td className="px-4 py-3 text-right">₹{t.amount.toLocaleString('en-IN')}</td>
                                 </tr>
                             ))}
                              {transactionsList.length === 0 && (

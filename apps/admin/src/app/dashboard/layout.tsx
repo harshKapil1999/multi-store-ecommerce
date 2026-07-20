@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { StoreSwitcher, Button } from '@/components/index';
-import { Menu, X, Home, Package, Grid3x3, Image, ShoppingCart, LogOut, Loader2, FileText, Moon, Sun, User, Settings, CreditCard } from 'lucide-react';
+import { Menu, X, Home, Package, Grid3x3, Image, ShoppingCart, LogOut, Loader2, FileText, Moon, Sun, User, CreditCard, Info } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/theme-context';
 import { logoutAction } from '@/lib/actions/auth';
 import { getClientSession } from '@/lib/session-client';
+import { signOutAdminFromFirebase } from '@/lib/firebase/client';
 
 export default function DashboardLayout({
   children,
@@ -67,6 +68,11 @@ export default function DashboardLayout({
 
   const handleLogout = async () => {
     setUser(null);
+    try {
+      await signOutAdminFromFirebase();
+    } catch (error) {
+      console.error('Firebase sign-out failed:', error);
+    }
     await logoutAction();
   };
 
@@ -80,6 +86,17 @@ export default function DashboardLayout({
     { name: 'Transactions', href: '/dashboard/transactions', icon: CreditCard },
     { name: 'Pages', href: '/dashboard/pages', icon: FileText },
   ];
+
+  const guidance = [
+    { path: '/dashboard/stores', title: 'Stores', text: 'Controls each storefront identity, URL, logo, status, home billboards, and announcement bar.' },
+    { path: '/dashboard/billboards', title: 'Billboards', text: 'Large promotional images shown in storefront hero areas and category campaigns. Order controls display priority.' },
+    { path: '/dashboard/categories', title: 'Categories', text: 'Builds storefront navigation and collection pages. Parent categories create menu groups; inactive categories stay hidden.' },
+    { path: '/dashboard/products', title: 'Products', text: 'Controls customer-visible catalog data, pricing, inventory, media order, attributes, variants, and spotlight eligibility.' },
+    { path: '/dashboard/orders', title: 'Orders', text: 'Use this for fulfilment. Status changes are visible to customers and send transactional updates.' },
+    { path: '/dashboard/transactions', title: 'Transactions', text: 'Payment-provider records for reconciliation. Captured payments should map to exactly one paid order.' },
+    { path: '/dashboard/pages', title: 'Pages', text: 'Create store-specific content and legal pages. Only published pages and visible sections appear in the storefront.' },
+    { path: '/dashboard', title: 'Dashboard', text: 'A store-scoped operational summary. Select a store above before reviewing catalog or fulfilment data.' },
+  ].find((item) => item.path === '/dashboard' ? pathname === item.path : pathname.startsWith(item.path));
 
   return (
     <div className="flex h-screen bg-background">
@@ -207,6 +224,13 @@ export default function DashboardLayout({
             </div>
           </div>
         </header>
+
+        {guidance && (
+          <div className="flex items-start gap-3 border-b border-border bg-muted/35 px-4 py-3 text-sm md:px-6">
+            <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <p><span className="font-semibold">{guidance.title}:</span> <span className="text-muted-foreground">{guidance.text}</span></p>
+          </div>
+        )}
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto">

@@ -24,36 +24,24 @@ async function getCategoryData(storeSlug: string, categorySlug: string, page = 1
      const category = await api.get<CategoryWithChildren>(`/stores/${store._id}/categories/slug/${categorySlug}`);
      if (!category) throw new Error('Category not found');
 
-     // Recursively collect all category IDs (current + all descendants)
-     const getAllCategoryIds = (cat: CategoryWithChildren): string[] => {
-       let ids = [cat._id];
-       if (cat.children && cat.children.length > 0) {
-         cat.children.forEach(child => {
-           ids = ids.concat(getAllCategoryIds(child));
-         });
-       }
-       return ids;
-     };
-
-     const allCategoryIds = getAllCategoryIds(category);
-
-     // Fetch products for all these categories
+     // Fetch products for this category AND all its descendants using the category parameter
+     // The backend handles recursive fetching
      const [productsData, categories] = await Promise.all([
-        // Fetch products from all category IDs in one query
-        api.get<{ data: Product[], total: number }>(`/stores/${store._id}/products?page=${page}&limit=12`),
+        // Pass the category ID to the backend which will recursively fetch products from all descendants
+        api.get<{ data: Product[], total: number, page: number, limit: number, totalPages: number }>(`/stores/${store._id}/products?category=${category._id}&page=${page}&limit=12`),
         api.get<CategoryWithChildren[]>(`/stores/${store._id}/categories/tree`),
      ]);
 
-     // Filter products to only include those in the current category and its descendants
-     const allProducts = Array.isArray(productsData?.data) ? productsData.data : [];
-     const filteredProducts = allProducts.filter(product => 
-       allCategoryIds.includes(product.categoryId)
-     );
+     const productsResponse = productsData as any;
+     const allProducts = Array.isArray(productsResponse?.data) ? productsResponse.data : [];
      
      return {
         store,
         category,
-        products: filteredProducts,
+        products: allProducts,
+        total: productsResponse?.total || 0,
+        page: productsResponse?.page || 1,
+        totalPages: productsResponse?.totalPages || 1,
         categories: Array.isArray(categories) ? categories : [],
         billboards: category.billboards || [],
      };
@@ -91,7 +79,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
            )}
         </div>
 
-        <div className="flex gap-8">
+        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
            {/* Sidebar */}
            <FilterSidebar 
               categories={categories} 
