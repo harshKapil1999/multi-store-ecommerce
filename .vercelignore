@@ -1,0 +1,14 @@
+.git
+.turbo
+.next
+**/.next
+node_modules
+**/node_modules
+.vercel
+**/.vercel
+.env
+.env.*
+**/.env
+**/.env.*
+*.log
+coverage

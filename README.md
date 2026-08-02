@@ -309,28 +309,12 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/api
 
 ## 🚢 Deployment
 
-### Frontend & Admin (Vercel)
-```bash
-cd apps/frontend
-vercel deploy
+Production uses Vercel for the storefront and admin, Google Cloud Run in
+`asia-south1` for the API, and Firebase Hosting for the backend custom domain.
 
-cd apps/admin
-vercel deploy
-```
-
-### Backend (Any Node.js host)
-```bash
-cd apps/backend
-pnpm build
-pnpm start
-```
-
-Consider deploying to:
-- Heroku
-- Railway
-- Render
-- AWS EC2
-- DigitalOcean
+See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for the complete first-time
+setup, environment variables, DNS records, verification, future deployment,
+and rollback procedures.
 
 ## 🤝 Contributing
 

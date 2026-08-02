@@ -43,4 +43,8 @@ lerna-debug.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
-docs/
+.env*
+
+# Local documentation (keep the production runbook versioned)
+docs/*
+!docs/DEPLOYMENT.md
