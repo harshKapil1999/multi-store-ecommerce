@@ -38,6 +38,10 @@ export const createRazorpayOrder = async (
     try {
         const { currency, orderId, storeId, notes } = req.body;
 
+        if (!orderId || !storeId) {
+            throw new AppError('Order and store are required to start payment', 400);
+        }
+
         const order = await Order.findOne({ _id: orderId, storeId });
         if (!order) {
             throw new AppError('Order not found', 404);
@@ -49,6 +53,7 @@ export const createRazorpayOrder = async (
 
         const existingTransaction = await Transaction.findOne({
             orderId,
+            storeId,
             status: { $in: ['created', 'authorized'] },
         }).sort({ createdAt: -1 });
 
@@ -57,7 +62,7 @@ export const createRazorpayOrder = async (
                 success: true,
                 data: {
                     razorpayOrderId: existingTransaction.razorpayOrderId,
-                    amount: order.total * 100,
+                    amount: Math.round(order.total * 100),
                     currency: existingTransaction.currency,
                     transactionId: existingTransaction._id,
                     keyId: process.env.RAZORPAY_KEY_ID,

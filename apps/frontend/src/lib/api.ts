@@ -25,7 +25,7 @@ export async function fetcher<T>(endpoint: string, options: RequestInit = {}): P
     const data = await res.json();
 
     if (!res.ok) {
-        throw new Error(data.message || 'An error occurred while fetching the data.');
+        throw new Error(data.message || data.error || `Request failed with status ${res.status}.`);
     }
 
     return data.data || data;

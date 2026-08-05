@@ -2,6 +2,43 @@ import { getRazorpayInstance } from '../config/razorpay.config';
 import crypto from 'crypto';
 import { AppError } from '../middleware/error-handler';
 
+type RazorpayError = {
+    statusCode?: number;
+    error?: {
+        code?: string;
+        description?: string;
+        reason?: string;
+        field?: string;
+    };
+    message?: string;
+};
+
+function getRazorpayErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+
+    if (error && typeof error === 'object') {
+        const razorpayError = error as RazorpayError;
+        const details = razorpayError.error;
+        const message = details?.description || details?.reason || razorpayError.message;
+
+        if (message) {
+            return details?.field ? `${message} (${details.field})` : message;
+        }
+
+        if (details?.code) {
+            return details.code;
+        }
+
+        if (razorpayError.statusCode) {
+            return `Razorpay returned HTTP ${razorpayError.statusCode}`;
+        }
+    }
+
+    return 'Razorpay did not provide an error message';
+}
+
 export class PaymentService {
     /**
      * Create a Razorpay order
@@ -12,17 +49,23 @@ export class PaymentService {
         receipt?: string;
         notes?: Record<string, string>;
     }) {
+        const amountInPaise = Math.round(Number(params.amount) * 100);
+
+        if (!Number.isSafeInteger(amountInPaise) || amountInPaise < 100) {
+            throw new AppError('The order total must be at least ₹1.00', 400);
+        }
+
         try {
             const order = await getRazorpayInstance().orders.create({
-                amount: Math.round(params.amount * 100), // Convert to paise
+                amount: amountInPaise,
                 currency: params.currency || 'INR',
-                receipt: params.receipt,
+                receipt: params.receipt?.slice(0, 40),
                 notes: params.notes,
             });
 
             return order;
-        } catch (error: any) {
-            throw new AppError(`Razorpay order creation failed: ${error.message}`, 500);
+        } catch (error) {
+            throw new AppError(`Razorpay order creation failed: ${getRazorpayErrorMessage(error)}`, 502);
         }
     }
 
@@ -58,8 +101,8 @@ export class PaymentService {
         try {
             const payment = await getRazorpayInstance().payments.fetch(paymentId);
             return payment;
-        } catch (error: any) {
-            throw new AppError(`Failed to fetch payment: ${error.message}`, 500);
+        } catch (error) {
+            throw new AppError(`Failed to fetch payment: ${getRazorpayErrorMessage(error)}`, 502);
         }
     }
 
@@ -72,8 +115,8 @@ export class PaymentService {
                 amount: amount ? Math.round(amount * 100) : undefined, // Convert to paise if provided
             });
             return refund;
-        } catch (error: any) {
-            throw new AppError(`Refund failed: ${error.message}`, 500);
+        } catch (error) {
+            throw new AppError(`Refund failed: ${getRazorpayErrorMessage(error)}`, 502);
         }
     }
 
@@ -84,8 +127,8 @@ export class PaymentService {
         try {
             const refund = await getRazorpayInstance().refunds.fetch(refundId);
             return refund;
-        } catch (error: any) {
-            throw new AppError(`Failed to fetch refund: ${error.message}`, 500);
+        } catch (error) {
+            throw new AppError(`Failed to fetch refund: ${getRazorpayErrorMessage(error)}`, 502);
         }
     }
 }

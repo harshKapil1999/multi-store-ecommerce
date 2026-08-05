@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store-context';
 import { Button } from '../ui/Button';
 import { useWishlist } from '@/lib/wishlist-store';
+import { toast } from 'sonner';
 
 interface CartSidebarProps {
   isOpen: boolean;
@@ -137,6 +138,7 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                           onClick={() => {
                             if (item.product) addWishlistItem(item.product);
                             removeItem(item.storeId, item.productId, item.variantId);
+                            toast.success(`${name} moved to your wishlist`);
                           }}
                           className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full"
                           aria-label={`Move ${name} to favourites`}
@@ -188,7 +190,7 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
               <p className="mt-1">Payment, address, and invoice details stay connected to this order.</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <Link href={`/${store?.slug}/bag`} onClick={onClose}>
                 <Button variant="outline" className="w-full rounded-full py-6 font-bold">
                   View Bag

@@ -11,12 +11,18 @@ import { useRouter } from 'next/navigation';
 import { OtpModal } from '@/components/auth/OtpModal';
 import { useAuth } from '@/lib/auth-store';
 import { User, CheckCircle2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 declare global {
   interface Window {
     Razorpay: any;
   }
 }
+
+type PendingOnlineOrder = {
+  _id: string;
+  orderNumber?: string;
+};
 
 export default function CheckoutPage() {
   const { store } = useStore();
@@ -25,6 +31,7 @@ export default function CheckoutPage() {
   const { user, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [pendingOnlineOrder, setPendingOnlineOrder] = useState<PendingOnlineOrder | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: user?.name.split(' ')[0] || '',
@@ -143,7 +150,17 @@ export default function CheckoutPage() {
         paymentMethod: paymentMethod,
       };
 
-      const order = await api.post<any>('/orders', orderPayload);
+      let order: PendingOnlineOrder;
+
+      if (paymentMethod === 'razorpay' && pendingOnlineOrder) {
+        order = pendingOnlineOrder;
+      } else {
+        order = await api.post<PendingOnlineOrder>('/orders', orderPayload);
+
+        if (paymentMethod === 'razorpay') {
+          setPendingOnlineOrder(order);
+        }
+      }
 
       // 2. Handle based on payment method
       if (paymentMethod === 'cod') {
@@ -153,8 +170,9 @@ export default function CheckoutPage() {
       }
 
       // 3. Create Razorpay order (for razorpay payment method)
+      await loadRazorpayCheckout();
+
       const razorpayData = await api.post<any>('/payment/create-order', {
-        amount: total,
         currency: 'INR',
         orderId: order._id,
         storeId: store._id,
@@ -164,7 +182,9 @@ export default function CheckoutPage() {
         }
       });
 
-      await loadRazorpayCheckout();
+      if (!razorpayData.keyId || !razorpayData.razorpayOrderId) {
+        throw new Error('Online payment is not configured correctly. Please contact support.');
+      }
 
       await new Promise<void>((resolve, reject) => {
         const options = {
@@ -183,14 +203,19 @@ export default function CheckoutPage() {
               razorpaySignature: response.razorpay_signature,
             };
 
-            const verifyResult = await api.post<any>('/payment/verify', verifyPayload);
+            try {
+              const verifyResult = await api.post<any>('/payment/verify', verifyPayload);
 
-            if (verifyResult) {
-              clearCart(store._id);
-              router.push(buildOrderSuccessUrl(store.slug, order._id));
-              resolve();
-            } else {
-              reject(new Error('Payment verification failed. Please contact support.'));
+              if (verifyResult) {
+                setPendingOnlineOrder(null);
+                clearCart(store._id);
+                router.push(buildOrderSuccessUrl(store.slug, order._id));
+                resolve();
+              } else {
+                reject(new Error('Payment verification failed. Please contact support.'));
+              }
+            } catch (error) {
+              reject(error);
             }
           },
           prefill: {
@@ -217,7 +242,7 @@ export default function CheckoutPage() {
 
     } catch (error: any) {
       console.error('Checkout error:', error);
-      alert(error.message || 'Something went wrong during checkout');
+      toast.error(error.message || 'Something went wrong during checkout');
     } finally {
       setLoading(false);
     }

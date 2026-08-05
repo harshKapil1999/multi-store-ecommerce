@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { ShoppingBag, Trash2, Heart, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useWishlist } from '@/lib/wishlist-store';
+import { toast } from 'sonner';
 
 export default function BagPage() {
   const { store } = useStore();
@@ -95,6 +96,7 @@ export default function BagPage() {
                             onClick={() => {
                               if (item.product) addWishlistItem(item.product);
                               removeItem(item.storeId, item.productId, item.variantId);
+                              toast.success(`${item.product?.name || 'Item'} moved to your wishlist`);
                             }}
                             className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
                             aria-label={`Move ${item.product?.name || 'item'} to wishlist`}
