@@ -55,6 +55,22 @@ function selectConfiguredItems<T extends { _id: string }>(items: T[], ids: strin
   return fallback.slice(0, limit);
 }
 
+function getHomeSections(homeSections?: HomeSectionConfig[]): HomeSectionConfig[] {
+  const savedSections = homeSections || [];
+  const savedById = new Map(savedSections.map((section) => [section.id, section]));
+  const defaultIds = new Set(DEFAULT_HOME_SECTIONS.map((section) => section.id));
+
+  const completeDefaults = DEFAULT_HOME_SECTIONS.map((section) => ({
+    ...section,
+    ...savedById.get(section.id),
+  }));
+
+  return [
+    ...completeDefaults,
+    ...savedSections.filter((section) => !defaultIds.has(section.id)),
+  ];
+}
+
 export default async function StorePage({ params }: PageProps) {
   const { storeSlug } = await params;
   const data = await getStoreData(storeSlug);
@@ -74,9 +90,13 @@ export default async function StorePage({ params }: PageProps) {
   const allCategories = flattenCategories(categories);
   const categoryTiles = allCategories.slice(0, 6);
   const spotlightProducts = products.slice(0, 8);
-  const configuredSections: HomeSectionConfig[] = (store.homeSections?.length ? store.homeSections : DEFAULT_HOME_SECTIONS)
+  const configuredSections = getHomeSections(store.homeSections)
     .filter((section) => section.isVisible)
     .sort((a, b) => a.order - b.order);
+  const catalogSections = configuredSections.filter((section) => section.type !== 'spotlight' && section.type !== 'newsletter');
+  const spotlightSections = configuredSections.filter((section) => section.type === 'spotlight');
+  const newsletterSections = configuredSections.filter((section) => section.type === 'newsletter');
+  const orderedSections = [...catalogSections, ...spotlightSections, ...newsletterSections];
 
   return (
     <>
@@ -135,8 +155,8 @@ export default async function StorePage({ params }: PageProps) {
         </section>
       )}
 
-      <div className="pb-20">
-        {configuredSections.map((section) => {
+      <div>
+        {orderedSections.map((section) => {
           const limit = Math.max(1, section.limit || 8);
 
           if (section.type === 'featured_categories') {

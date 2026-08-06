@@ -190,13 +190,13 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
               <p className="mt-1">Payment, address, and invoice details stay connected to this order.</p>
             </div>
 
-            <div className="space-y-4">
-              <Link href={`/${store?.slug}/bag`} onClick={onClose}>
+            <div className="flex flex-col gap-4">
+              <Link href={`/${store?.slug}/bag`} onClick={onClose} className="block">
                 <Button variant="outline" className="w-full rounded-full py-6 font-bold">
                   View Bag
                 </Button>
               </Link>
-              <Link href={`/${store?.slug}/checkout`} onClick={onClose}>
+              <Link href={`/${store?.slug}/checkout`} onClick={onClose} className="block">
                 <Button className="w-full rounded-full py-6 font-bold">
                   Checkout
                   <ArrowRight className="ml-2 h-4 w-4" />

@@ -79,10 +79,20 @@
 .store-page-content blockquote { border-left: 3px solid currentColor; margin: 1.25rem 0; padding-left: 1rem; }
 
 @layer base {
+  html {
+    min-height: 100%;
+    background-color: white;
+  }
+
+  html.dark {
+    background-color: black;
+  }
+
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply min-h-screen bg-background text-foreground;
+    overscroll-behavior-y: none;
   }
 }
