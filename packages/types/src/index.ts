@@ -248,6 +248,8 @@ export interface Order {
   razorpayOrderId?: string;
   shippingAddress: Address;
   billingAddress: Address;
+  fulfillment?: OrderFulfillment;
+  statusHistory?: OrderStatusHistoryEntry[];
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -281,6 +283,21 @@ export type OrderStatus =
   | 'refunded';
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+
+export interface OrderFulfillment {
+  carrier?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+  estimatedDelivery?: Date;
+  shippedAt?: Date;
+  deliveredAt?: Date;
+}
+
+export interface OrderStatusHistoryEntry {
+  status: OrderStatus;
+  at: Date;
+  note?: string;
+}
 
 export interface Address {
   firstName: string;

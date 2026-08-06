@@ -26,10 +26,21 @@ export default function LoginPage() {
       body: JSON.stringify({ idToken }),
     });
 
-    const payload = await response.json();
+    const responseText = await response.text();
+    let payload: { message?: string; data?: { user?: any } } = {};
+
+    try {
+      payload = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      payload = { message: 'Admin authentication is temporarily unavailable. Please try again shortly.' };
+    }
 
     if (!response.ok) {
       throw new Error(payload.message || 'Firebase session exchange failed');
+    }
+
+    if (!payload.data?.user) {
+      throw new Error('Admin authentication returned an incomplete session. Please try again.');
     }
 
     return payload.data.user;
@@ -78,7 +89,6 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden">
       {/* Dynamic Background Effects */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-neutral-900 via-black to-black" />
-      <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
       
       {/* Decorative Orbs */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] animate-pulse" />

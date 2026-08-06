@@ -190,6 +190,13 @@ export async function finalizeCapturedPayment(params: {
           status: 'pending',
           notes: reviewNote,
         },
+        $push: {
+          statusHistory: {
+            status: 'pending',
+            at: new Date(),
+            note: 'Payment captured. Inventory reconciliation is required before fulfilment.',
+          },
+        },
       },
       { new: true }
     );
@@ -203,12 +210,19 @@ export async function finalizeCapturedPayment(params: {
 
   order = await Order.findByIdAndUpdate(
     claimedOrder._id,
-    {
-      $set: {
-        paymentStatus: 'paid',
-        status: 'confirmed',
+      {
+        $set: {
+          paymentStatus: 'paid',
+          status: 'confirmed',
+        },
+        $push: {
+          statusHistory: {
+            status: 'confirmed',
+            at: new Date(),
+            note: 'Payment captured and order confirmed.',
+          },
+        },
       },
-    },
     { new: true }
   );
 

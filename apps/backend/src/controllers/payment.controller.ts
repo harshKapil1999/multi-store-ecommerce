@@ -148,7 +148,23 @@ export const verifyPayment = async (
         }
 
         if (paymentDetails.status !== 'captured' && paymentDetails.captured !== true) {
-            throw new AppError('Payment is not captured yet', 409);
+            transaction.status = 'authorized';
+            transaction.razorpayPaymentId = razorpayPaymentId;
+            transaction.razorpaySignature = razorpaySignature;
+            transaction.method = paymentDetails.method;
+            transaction.email = paymentDetails.email;
+            transaction.phone = String(paymentDetails.contact || '');
+            await transaction.save();
+
+            return res.status(202).json({
+                success: true,
+                message: 'Payment is authorized and awaiting Razorpay capture confirmation.',
+                data: {
+                    orderId: transaction.orderId,
+                    transactionId: String(transaction._id),
+                    state: 'processing',
+                },
+            });
         }
 
         const fulfillment = await finalizeCapturedPayment({

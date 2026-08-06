@@ -52,11 +52,15 @@ export default function CheckoutPage() {
   const delivery = subtotal > 2500 ? 0 : 750; // Updated delivery fee to be more realistic
   const total = subtotal + delivery;
 
-  const buildOrderSuccessUrl = (storeSlug: string, orderId: string) => {
+  const buildOrderSuccessUrl = (storeSlug: string, orderId: string, transactionId?: string) => {
     const params = new URLSearchParams({
       orderId,
       email: formData.email,
     });
+
+    if (transactionId) {
+      params.set('transactionId', transactionId);
+    }
 
     return `/${storeSlug}/order-success?${params.toString()}`;
   };
@@ -209,13 +213,21 @@ export default function CheckoutPage() {
               if (verifyResult) {
                 setPendingOnlineOrder(null);
                 clearCart(store._id);
-                router.push(buildOrderSuccessUrl(store.slug, order._id));
+                router.replace(buildOrderSuccessUrl(store.slug, verifyResult.orderId || order._id, verifyResult.transactionId || razorpayData.transactionId));
                 resolve();
               } else {
                 reject(new Error('Payment verification failed. Please contact support.'));
               }
             } catch (error) {
-              reject(error);
+              // Razorpay has already reported success. The webhook is authoritative if the
+              // browser cannot complete the verification request (network interruptions,
+              // capture delay, or a navigation during checkout).
+              console.error('Payment verification follow-up failed:', error);
+              setPendingOnlineOrder(null);
+              clearCart(store._id);
+              toast.message('Payment received. We are confirming your order now.');
+              router.replace(buildOrderSuccessUrl(store.slug, order._id, razorpayData.transactionId));
+              resolve();
             }
           },
           prefill: {

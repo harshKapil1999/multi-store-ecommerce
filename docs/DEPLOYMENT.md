@@ -155,6 +155,31 @@ gcloud run services describe crabtile-shop-backend \
 
 Never commit the exported file because it may contain environment metadata.
 
+### Transactional email sender
+
+Use the primary Hostinger mailbox only for SMTP authentication and use the
+purpose-specific Crabtile aliases as the visible sender addresses. An alias
+does not have its own SMTP password.
+
+```text
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=<primary-hostinger-mailbox>@crabtile.com
+SMTP_FROM=shop@crabtile.com
+MAIL_FROM_NAME=Crabtile Shop
+MAIL_FROM_AUTH=noreply@crabtile.com
+MAIL_FROM_ORDERS=orders@crabtile.com
+MAIL_REPLY_TO_ORDERS=orders@crabtile.com
+MAIL_REPLY_TO_SUPPORT=support@crabtile.com
+```
+
+Replace the `backend-smtp-pass` secret with the Hostinger primary mailbox
+password before changing `SMTP_HOST`. Then deploy a new Cloud Run revision and
+send one OTP plus one order-status test email. Hostinger SPF and DKIM records
+must remain enabled; publish a DMARC record before moving Razorpay to live
+payments.
+
 ## Backend: deploy future changes
 
 The checked-in `cloudbuild.backend.yaml` builds the monorepo with

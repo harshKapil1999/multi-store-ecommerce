@@ -40,8 +40,17 @@ export const useUpdateOrderStatus = (orderId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (status: string) => {
-      const { data } = await apiClient.put(`/orders/${orderId}/status`, { status });
+    mutationFn: async (payload: {
+      status: string;
+      note?: string;
+      fulfillment?: {
+        carrier?: string;
+        trackingNumber?: string;
+        trackingUrl?: string;
+        estimatedDelivery?: string;
+      };
+    }) => {
+      const { data } = await apiClient.put(`/orders/${orderId}/status`, payload);
       return data;
     },
     onSuccess: (data) => {

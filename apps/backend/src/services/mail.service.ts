@@ -183,6 +183,9 @@ class MailService {
   async sendOrderStatusUpdate(email: string, order: any, previousStatus?: string) {
     const orderData = typeof order?.toObject === 'function' ? order.toObject() : order;
     const orderNumber = orderData.orderNumber || orderData._id;
+    const fulfillment = orderData.fulfillment || {};
+    const trackingUrl = fulfillment.trackingUrl || await this.trackingUrl(orderData, email);
+    const trackingDetails = [fulfillment.carrier, fulfillment.trackingNumber].filter(Boolean).join(' - ');
 
     await this.send(
       {
@@ -190,7 +193,7 @@ class MailService {
         replyTo: process.env.MAIL_REPLY_TO_ORDERS || process.env.MAIL_REPLY_TO_SUPPORT,
         to: email,
         subject: `Order #${orderNumber} is now ${orderData.status}`,
-        text: `Your order #${orderNumber} status changed from ${previousStatus || 'pending'} to ${orderData.status}.`,
+        text: `Your order #${orderNumber} status changed from ${previousStatus || 'pending'} to ${orderData.status}.${trackingDetails ? ` Tracking: ${trackingDetails}.` : ''}`,
         html: `
           <div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:28px;color:#111111;">
             <p style="font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#666666;margin:0 0 18px;">Order update</p>
@@ -201,6 +204,8 @@ class MailService {
               <p style="margin:0;color:#666666;">Current status</p>
               <p style="margin:6px 0 0;text-transform:capitalize;font-size:24px;font-weight:800;">${escapeHtml(orderData.status)}</p>
             </div>
+            ${trackingDetails ? `<p style="font-size:15px;line-height:1.6;color:#555555;margin:0 0 18px;"><strong>Shipment:</strong> ${escapeHtml(trackingDetails)}</p>` : ''}
+            ${trackingUrl ? `<a href="${escapeHtml(trackingUrl)}" style="display:inline-block;background:#111111;color:#ffffff;text-decoration:none;border-radius:999px;padding:14px 22px;font-weight:700;">Track your order</a>` : ''}
             <p style="font-size:14px;line-height:1.6;color:#666666;margin:0;">We will keep updating your order as it moves through fulfillment.</p>
           </div>
         `,

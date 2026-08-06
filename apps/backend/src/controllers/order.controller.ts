@@ -8,6 +8,14 @@ import { AuthRequest } from '../middleware/auth';
 import { generateOrderNumber } from '@repo/utils';
 import { mailService } from '../services/mail.service';
 
+const ORDER_STATUSES = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
+
+const cleanOptionalText = (value: unknown, maxLength: number) => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, maxLength) : undefined;
+};
+
 const shouldCommitInventoryAtOrderCreation = (paymentMethod?: string) => paymentMethod === 'cod';
 
 const userOwnsStore = async (userId: string, storeId: string) => {
@@ -236,6 +244,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
     const shipping = subtotal > 2500 ? 0 : 750;
     const total = subtotal + shipping;
 
+    const initialStatus = paymentMethod === 'cod' ? 'confirmed' : 'pending';
     const order = await Order.create({
       storeId,
       orderNumber: generateOrderNumber(),
@@ -249,7 +258,7 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
       subtotal,
       shipping,
       total,
-      status: paymentMethod === 'cod' ? 'confirmed' : 'pending',
+      status: initialStatus,
       paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
       paymentMethod,
       shippingAddress: {
@@ -274,6 +283,11 @@ export const createOrder = async (req: Request, res: Response, next: NextFunctio
         country: billingAddress.country,
         phone: customer.phone,
       },
+      statusHistory: [{
+        status: initialStatus,
+        at: new Date(),
+        note: paymentMethod === 'cod' ? 'Order placed with Cash on Delivery.' : 'Order created and awaiting online payment.',
+      }],
     });
 
     if (paymentMethod === 'cod') {
@@ -296,7 +310,7 @@ export const updateOrderStatus = async (
   next: NextFunction
 ) => {
   try {
-    const { status } = req.body;
+    const { status, fulfillment: fulfillmentInput, note } = req.body;
     const order = await Order.findById(req.params.id);
 
     if (!order) {
@@ -307,11 +321,52 @@ export const updateOrderStatus = async (
 	      throw new AppError('Not authorized to update this order', 403);
 	    }
 
-	    const previousStatus = order.status;
-	    order.status = status;
-	    await order.save();
+    if (!ORDER_STATUSES.includes(status)) {
+      throw new AppError('A valid order status is required', 400);
+    }
 
-	    if (previousStatus !== status) {
+    const previousStatus = order.status;
+    const historyNote = cleanOptionalText(note, 500);
+    const fulfillment = fulfillmentInput && typeof fulfillmentInput === 'object'
+      ? {
+          carrier: cleanOptionalText(fulfillmentInput.carrier, 120),
+          trackingNumber: cleanOptionalText(fulfillmentInput.trackingNumber, 160),
+          trackingUrl: cleanOptionalText(fulfillmentInput.trackingUrl, 500),
+          estimatedDelivery: fulfillmentInput.estimatedDelivery ? new Date(fulfillmentInput.estimatedDelivery) : undefined,
+        }
+      : undefined;
+
+    if (fulfillment?.estimatedDelivery && Number.isNaN(fulfillment.estimatedDelivery.getTime())) {
+      throw new AppError('Estimated delivery must be a valid date', 400);
+    }
+
+    order.status = status;
+    if (fulfillment) {
+      const currentFulfillment = order.fulfillment || {};
+      order.fulfillment = {
+        ...currentFulfillment,
+        ...Object.fromEntries(Object.entries(fulfillment).filter(([, value]) => value !== undefined)),
+      };
+    }
+
+    if (status === 'shipped' && !order.fulfillment?.shippedAt) {
+      order.fulfillment = { ...(order.fulfillment || {}), shippedAt: new Date() };
+    }
+
+    if (status === 'delivered' && !order.fulfillment?.deliveredAt) {
+      order.fulfillment = { ...(order.fulfillment || {}), deliveredAt: new Date() };
+    }
+
+    if (previousStatus !== status || historyNote) {
+      order.statusHistory = [
+        ...(order.statusHistory || []),
+        { status, at: new Date(), note: historyNote },
+      ];
+    }
+
+    await order.save();
+
+    if (previousStatus !== status || historyNote) {
 	      try {
 	        await mailService.sendOrderStatusUpdate(order.customer.email, order, previousStatus);
 	      } catch (error) {

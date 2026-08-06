@@ -122,6 +122,28 @@ const orderSchema = new Schema<IOrder>(
       postalCode: String,
       phone: String,
     },
+    fulfillment: {
+      carrier: String,
+      trackingNumber: String,
+      trackingUrl: String,
+      estimatedDelivery: Date,
+      shippedAt: Date,
+      deliveredAt: Date,
+    },
+    statusHistory: [
+      {
+        status: {
+          type: String,
+          enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
+          required: true,
+        },
+        at: {
+          type: Date,
+          required: true,
+        },
+        note: String,
+      },
+    ],
     notes: String,
   },
   {

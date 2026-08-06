@@ -1,9 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOrder, useUpdateOrderStatus } from '@/hooks/useOrders';
-import { Button, Card, FormSelect } from '@/components/index';
-import { ArrowLeft, Package, User, MapPin, CreditCard, Loader2 } from 'lucide-react';
+import { Button, Card, FormSelect, FormInput, FormTextarea } from '@/components/index';
+import { ArrowLeft, Package, User, MapPin, CreditCard, Loader2, Truck } from 'lucide-react';
 import type { OrderStatus, OrderItem, Order } from '@repo/types';
 import Image from 'next/image';
 
@@ -27,6 +28,24 @@ export default function OrderDetailPage({
   const updateStatusMutation = useUpdateOrderStatus(params.orderId);
 
   const order = data?.data as Order | undefined;
+  const [status, setStatus] = useState<OrderStatus>('pending');
+  const [carrier, setCarrier] = useState('');
+  const [trackingNumber, setTrackingNumber] = useState('');
+  const [trackingUrl, setTrackingUrl] = useState('');
+  const [estimatedDelivery, setEstimatedDelivery] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (!order) return;
+
+    setStatus(order.status);
+    setCarrier(order.fulfillment?.carrier || '');
+    setTrackingNumber(order.fulfillment?.trackingNumber || '');
+    setTrackingUrl(order.fulfillment?.trackingUrl || '');
+    setEstimatedDelivery(order.fulfillment?.estimatedDelivery
+      ? new Date(order.fulfillment.estimatedDelivery).toISOString().slice(0, 10)
+      : '');
+  }, [order]);
 
   if (isLoading) {
     return (
@@ -52,8 +71,19 @@ export default function OrderDetailPage({
     );
   }
 
-  const handleStatusChange = (newStatus: string) => {
-    updateStatusMutation.mutate(newStatus as OrderStatus);
+  const handleFulfillmentUpdate = () => {
+    updateStatusMutation.mutate({
+      status,
+      note: note || undefined,
+      fulfillment: {
+        carrier: carrier || undefined,
+        trackingNumber: trackingNumber || undefined,
+        trackingUrl: trackingUrl || undefined,
+        estimatedDelivery: estimatedDelivery || undefined,
+      },
+    }, {
+      onSuccess: () => setNote(''),
+    });
   };
 
   const subtotal = order.items.reduce((sum: number, item: OrderItem) => sum + item.price * item.quantity, 0);
@@ -127,6 +157,21 @@ export default function OrderDetailPage({
               ))}
             </div>
           </Card>
+
+          {order.statusHistory && order.statusHistory.length > 0 && (
+            <Card className="p-6">
+              <h2 className="mb-4 text-lg font-semibold">Order Timeline</h2>
+              <div className="space-y-4">
+                {order.statusHistory.slice().reverse().map((entry, index) => (
+                  <div key={`${entry.status}-${entry.at}-${index}`} className="border-l-2 border-border pl-4">
+                    <p className="font-medium capitalize">{entry.status}</p>
+                    {entry.note && <p className="mt-1 text-sm text-muted-foreground">{entry.note}</p>}
+                    <p className="mt-1 text-xs text-muted-foreground">{new Date(entry.at).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Addresses */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -238,9 +283,12 @@ export default function OrderDetailPage({
             </div>
           </Card>
 
-          {/* Update Status */}
+          {/* Fulfilment and Status */}
           <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Update Status</h2>
+            <div className="mb-4 flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              <h2 className="text-lg font-semibold">Fulfilment</h2>
+            </div>
             <FormSelect
               options={[
                 { value: 'pending', label: 'Pending' },
@@ -251,9 +299,19 @@ export default function OrderDetailPage({
                 { value: 'cancelled', label: 'Cancelled' },
                 { value: 'refunded', label: 'Refunded' },
               ]}
-              value={order.status}
-              onValueChange={handleStatusChange}
+              value={status}
+              onValueChange={(value) => setStatus(value as OrderStatus)}
             />
+            <div className="mt-4 space-y-4">
+              <FormInput label="Carrier" value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="e.g. Delhivery" />
+              <FormInput label="Tracking number" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Carrier reference" />
+              <FormInput label="Carrier tracking URL" type="url" value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} placeholder="https://..." />
+              <FormInput label="Estimated delivery" type="date" value={estimatedDelivery} onChange={(event) => setEstimatedDelivery(event.target.value)} />
+              <FormTextarea label="Customer-visible update note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Optional note to include in this status update" />
+              <Button className="w-full" onClick={handleFulfillmentUpdate} disabled={updateStatusMutation.isPending}>
+                {updateStatusMutation.isPending ? 'Saving...' : 'Save fulfilment update'}
+              </Button>
+            </div>
           </Card>
         </div>
       </div>

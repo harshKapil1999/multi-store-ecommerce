@@ -14,6 +14,7 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const email = searchParams.get('email');
+  const transactionId = searchParams.get('transactionId');
   const { store } = useStore();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +71,10 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
     );
   }
 
+  const isPaid = order.paymentStatus === 'paid';
+  const fulfillment = order.fulfillment || {};
+  const history = Array.isArray(order.statusHistory) ? order.statusHistory : [];
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black py-20 px-4">
       <div className="max-w-3xl mx-auto">
@@ -78,8 +83,15 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
             <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-6">
               <CheckCircle2 size={40} className="text-green-600 dark:text-green-400" />
             </div>
-            <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase mb-2">Order Confirmed</h1>
+            <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase mb-2">
+              {isPaid ? 'Order Confirmed' : 'Payment Processing'}
+            </h1>
             <p className="text-gray-500 dark:text-gray-400">Order #{order.orderNumber}</p>
+            {!isPaid && (
+              <p className="mt-3 max-w-md text-center text-sm text-gray-500 dark:text-gray-400">
+                Razorpay is confirming the payment. This page checks your order automatically, so you can keep it open.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10 border-t border-b border-gray-100 dark:border-white/5 py-10">
@@ -97,6 +109,11 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
                 <p className="font-medium capitalize">{order.paymentStatus}</p>
               </div>
               <p className="text-gray-500 dark:text-gray-400">Method: {order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}</p>
+              {(order.transactionId || transactionId) && (
+                <p className="mt-2 break-all text-xs text-gray-500 dark:text-gray-400">
+                  Payment reference: {order.transactionId || transactionId}
+                </p>
+              )}
 
               <h3 className="font-bold mb-4 mt-6 uppercase text-sm tracking-widest text-gray-400">Order Total</h3>
               <p className="text-2xl font-black">₹ {order.total.toLocaleString('en-IN')}</p>
@@ -131,7 +148,37 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
             <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
               This page refreshes order status automatically while fulfillment is in progress.
             </p>
+            {(fulfillment.carrier || fulfillment.trackingNumber || fulfillment.estimatedDelivery) && (
+              <div className="mt-5 rounded-xl border border-gray-200 bg-white p-4 text-sm dark:border-white/10 dark:bg-zinc-900">
+                <p className="font-semibold">Shipment details</p>
+                {fulfillment.carrier && <p className="mt-1 text-gray-500 dark:text-gray-400">Carrier: {fulfillment.carrier}</p>}
+                {fulfillment.trackingNumber && <p className="text-gray-500 dark:text-gray-400">Tracking number: {fulfillment.trackingNumber}</p>}
+                {fulfillment.estimatedDelivery && <p className="text-gray-500 dark:text-gray-400">Estimated delivery: {new Date(fulfillment.estimatedDelivery).toLocaleDateString()}</p>}
+                {fulfillment.trackingUrl && (
+                  <a href={fulfillment.trackingUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block font-semibold underline">
+                    Open carrier tracking
+                  </a>
+                )}
+              </div>
+            )}
           </div>
+
+          {history.length > 0 && (
+            <div className="mb-12 rounded-2xl border border-gray-100 p-5 dark:border-white/10">
+              <h3 className="mb-4 font-bold uppercase text-sm tracking-widest text-gray-400">Order updates</h3>
+              <div className="space-y-3">
+                {history.slice().reverse().map((entry: any, index: number) => (
+                  <div key={`${entry.status}-${entry.at}-${index}`} className="flex items-start justify-between gap-4 text-sm">
+                    <div>
+                      <p className="font-semibold capitalize">{entry.status}</p>
+                      {entry.note && <p className="text-gray-500 dark:text-gray-400">{entry.note}</p>}
+                    </div>
+                    <time className="shrink-0 text-xs text-gray-500 dark:text-gray-400">{new Date(entry.at).toLocaleString()}</time>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-6 mb-12">
             <h3 className="font-bold uppercase text-sm tracking-widest text-gray-400">Items Ordered</h3>

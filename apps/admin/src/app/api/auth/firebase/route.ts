@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSession } from '@/lib/session';
 import { verifyFirebaseIdToken } from '@/lib/firebase/admin';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 function getAllowedAdminEmails() {
   return (process.env.FIREBASE_ADMIN_EMAILS || '')
     .split(',')
@@ -49,9 +52,14 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Firebase Auth] Session exchange failed:', error);
+    const isConfigurationError = /credentials are incomplete|session signing is not configured/i.test(error?.message || '');
     return NextResponse.json(
-      { message: error?.message || 'Firebase authentication failed' },
-      { status: 401 }
+      {
+        message: isConfigurationError
+          ? 'Admin authentication is temporarily unavailable. Please contact support.'
+          : error?.message || 'Firebase authentication failed',
+      },
+      { status: isConfigurationError ? 500 : 401 }
     );
   }
 }
