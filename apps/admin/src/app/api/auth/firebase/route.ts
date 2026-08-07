@@ -27,10 +27,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Firebase user email is required' }, { status: 400 });
     }
 
-    if (!decodedToken.email_verified) {
-      return NextResponse.json({ message: 'Verify your email before accessing admin' }, { status: 403 });
-    }
-
     const allowedAdminEmails = getAllowedAdminEmails();
     if (allowedAdminEmails.length === 0) {
       return NextResponse.json({ message: 'FIREBASE_ADMIN_EMAILS is not configured' }, { status: 500 });
