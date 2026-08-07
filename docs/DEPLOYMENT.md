@@ -278,6 +278,9 @@ This repository uses two independent Vercel projects:
 
 Vercel must install dependencies from the pnpm workspace and build the selected
 Next.js app. Do not deploy the repository root as a single Next.js project.
+Each app's checked-in `vercel.json` compiles `@repo/types` before running its
+Next.js build; removing that step breaks clean Git builds because generated
+workspace output is intentionally not committed.
 
 Storefront production environment:
 
