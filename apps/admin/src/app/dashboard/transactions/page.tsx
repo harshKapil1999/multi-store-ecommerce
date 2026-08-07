@@ -6,6 +6,8 @@ import { DataTable, Card } from '@/components/index';
 import type { ColumnDef } from '@tanstack/react-table';
 import type { Transaction } from '@repo/types';
 import { CreditCard, DollarSign } from 'lucide-react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function TransactionsPage() {
   const { selectedStoreId } = useSelectedStore();
@@ -69,6 +71,11 @@ export default function TransactionsPage() {
           {new Date(row.original.createdAt).toLocaleString()}
         </span>
       ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => <Link href={`/dashboard/transactions/${row.original._id}`}><Button variant="outline" size="sm">Review</Button></Link>,
     },
   ];
 

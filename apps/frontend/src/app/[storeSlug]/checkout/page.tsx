@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useCart } from '@/lib/cart-store';
 import { useStore } from '@/lib/store-context';
 import { Button } from '@/components/ui/Button';
-import { ShoppingBag, ChevronRight, Truck, CreditCard, Lock } from 'lucide-react';
+import { ShoppingBag, Truck, CreditCard, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ import { OtpModal } from '@/components/auth/OtpModal';
 import { useAuth } from '@/lib/auth-store';
 import { User, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { UserAddress } from '@repo/types';
 
 declare global {
   interface Window {
@@ -32,6 +33,8 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [pendingOnlineOrder, setPendingOnlineOrder] = useState<PendingOnlineOrder | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
 
   const [formData, setFormData] = useState({
     firstName: user?.name.split(' ')[0] || '',
@@ -46,6 +49,43 @@ export default function CheckoutPage() {
   });
 
   const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay');
+
+  const applySavedAddress = (address: UserAddress) => {
+    setSelectedAddressId(address._id || '');
+    setFormData((current) => ({
+      ...current,
+      firstName: address.firstName || current.firstName,
+      lastName: address.lastName || current.lastName,
+      phone: address.phone || current.phone,
+      address: address.address1,
+      address2: address.address2 || '',
+      city: address.city,
+      pincode: address.postalCode,
+      state: address.state,
+    }));
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    let isCurrent = true;
+
+    api.get<UserAddress[]>('/auth/addresses')
+      .then((addresses) => {
+        if (!isCurrent) return;
+
+        setSavedAddresses(addresses);
+        const preferredAddress = addresses.find((address) => address.isDefault) || addresses[0];
+        if (preferredAddress) applySavedAddress(preferredAddress);
+      })
+      .catch((error) => {
+        console.error('Unable to load saved addresses:', error);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isAuthenticated]);
 
   const storeItems = store ? items.filter((item) => item.storeId === store._id) : [];
   const subtotal = store ? getSubtotal(store._id) : 0;
@@ -345,6 +385,25 @@ export default function CheckoutPage() {
             <section>
               <h2 className="text-2xl font-semibold mb-8">Enter your name and address:</h2>
               <form onSubmit={handleCheckout} className="space-y-4">
+                {savedAddresses.length > 0 && (
+                  <label className="block pb-2">
+                    <span className="mb-2 block text-sm font-semibold">Use a saved address</span>
+                    <select
+                      value={selectedAddressId}
+                      onChange={(event) => {
+                        const address = savedAddresses.find((item) => item._id === event.target.value);
+                        if (address) applySavedAddress(address);
+                      }}
+                      className="w-full rounded-md border border-gray-300 bg-transparent p-4 dark:border-white/20 dark:bg-black dark:text-white"
+                    >
+                      {savedAddresses.map((address, index) => (
+                        <option key={address._id || index} value={address._id || ''}>
+                          {address.isDefault ? 'Default: ' : ''}{address.address1}, {address.city} {address.postalCode}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input required name="firstName" placeholder="First Name" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.firstName} onChange={handleInputChange} />
                   <input required name="lastName" placeholder="Last Name" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.lastName} onChange={handleInputChange} />

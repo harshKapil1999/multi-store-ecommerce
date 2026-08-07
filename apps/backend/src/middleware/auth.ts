@@ -67,6 +67,14 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
+export const optionalAuthenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.headers.authorization && !req.cookies?.session) {
+    return next();
+  }
+
+  return authenticate(req, res, next);
+};
+
 export const authorize = (...roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {

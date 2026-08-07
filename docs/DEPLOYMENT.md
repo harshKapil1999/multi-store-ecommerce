@@ -298,13 +298,13 @@ NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=<Firebase web config>
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=<Firebase web config>
 NEXT_PUBLIC_FIREBASE_APP_ID=<Firebase web config>
 FIREBASE_PROJECT_ID=<Firebase Admin project>
-FIREBASE_CLIENT_EMAIL=<Firebase Admin service account>
-FIREBASE_PRIVATE_KEY=<Firebase Admin private key>
 FIREBASE_ADMIN_EMAILS=<comma-separated allowlist>
 ```
 
-Firebase web configuration values are public identifiers, but the Firebase
-private key and session secret are secrets and must remain encrypted in Vercel.
+Firebase web configuration values are public identifiers. The server verifies
+Firebase ID tokens against Google's published signing keys, so no Firebase
+service-account private key is required by the admin deployment. The session
+secret is private and must remain encrypted in Vercel.
 
 ## Frontend and admin: deploy future changes
 
@@ -327,9 +327,18 @@ as the project root. Do not run a manual upload with `--cwd apps/frontend` or
 Vercel production environment variable changes only affect new deployments.
 Redeploy after changing a variable.
 
-For normal releases, connect both projects to the Git repository and set the
-respective root directories. Production deploys should come from the protected
-main branch; pull requests should create Preview deployments.
+Both projects are connected to
+`https://github.com/harshKapil1999/multi-store-ecommerce.git`:
+
+```text
+crabtile-shop-frontend -> apps/frontend
+crabtile-shop-admin    -> apps/admin
+```
+
+For normal releases, merge or push a verified commit to `main`. Vercel builds
+both production projects automatically, while pull requests create Preview
+deployments. Confirm both deployments are Ready before considering the release
+complete. Manual uploads remain a recovery path, not the normal CI/CD path.
 
 ## Vercel rollback
 

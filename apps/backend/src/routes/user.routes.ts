@@ -51,4 +51,20 @@ router.put(
   userController.changePassword
 );
 
+const addressValidation = [
+  body('firstName').notEmpty().trim(),
+  body('lastName').notEmpty().trim(),
+  body('address1').notEmpty().trim(),
+  body('city').notEmpty().trim(),
+  body('state').notEmpty().trim(),
+  body('country').notEmpty().trim(),
+  body('postalCode').notEmpty().trim(),
+  body('phone').optional().trim(),
+];
+
+router.get('/addresses', authenticate, userController.getAddresses);
+router.post('/addresses', authenticate, addressValidation, userController.addAddress);
+router.put('/addresses/:addressId', authenticate, addressValidation, userController.updateAddress);
+router.delete('/addresses/:addressId', authenticate, userController.deleteAddress);
+
 export default router;

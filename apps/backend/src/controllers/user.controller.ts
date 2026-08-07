@@ -8,6 +8,8 @@ import { mailService } from '../services/mail.service';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
 import { generateOtp } from '@repo/utils';
+import mongoose from 'mongoose';
+import { Order } from '../models/order.model';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -211,7 +213,7 @@ export const changePassword = async (
 
 export const sendOtp = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
 
     if (!email) {
       throw new AppError('Email is required', 400);
@@ -241,7 +243,8 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction) =
 
 export const verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, otp, name } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const { otp, name } = req.body;
 
     if (!email || !otp) {
       throw new AppError('Email and OTP are required', 400);
@@ -275,6 +278,11 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
       });
     }
 
+    await Order.updateMany(
+      { 'customer.email': email.toLowerCase(), 'customer.userId': { $exists: false } },
+      { $set: { 'customer.userId': String(user._id) } }
+    );
+
     // Generate token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
@@ -294,6 +302,87 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
         token,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const normalizeAddress = (input: any) => ({
+  firstName: String(input.firstName || '').trim(),
+  lastName: String(input.lastName || '').trim(),
+  address1: String(input.address1 || '').trim(),
+  address2: String(input.address2 || '').trim(),
+  city: String(input.city || '').trim(),
+  state: String(input.state || '').trim(),
+  country: String(input.country || 'India').trim(),
+  postalCode: String(input.postalCode || '').trim(),
+  phone: String(input.phone || '').trim(),
+  isDefault: Boolean(input.isDefault),
+});
+
+export const getAddresses = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await User.findById(req.user!.id).select('addresses');
+    if (!user) throw new AppError('User not found', 404);
+    res.json({ success: true, data: user.addresses || [] });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const addAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new AppError('Complete all required address fields', 400);
+    const user = await User.findById(req.user!.id);
+    if (!user) throw new AppError('User not found', 404);
+    const address = normalizeAddress(req.body);
+    const addresses = user.addresses || [];
+    if (address.isDefault || !addresses.length) {
+      addresses.forEach((item: any) => { item.isDefault = false; });
+      address.isDefault = true;
+    }
+    addresses.push(address as any);
+    user.addresses = addresses;
+    await user.save();
+    res.status(201).json({ success: true, data: user.addresses });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new AppError('Complete all required address fields', 400);
+    if (!mongoose.isValidObjectId(req.params.addressId)) throw new AppError('Invalid address', 400);
+    const user = await User.findById(req.user!.id);
+    if (!user) throw new AppError('User not found', 404);
+    const addresses = user.addresses || [];
+    const address = (addresses as any).id(req.params.addressId);
+    if (!address) throw new AppError('Address not found', 404);
+    const nextAddress = normalizeAddress({ ...address.toObject(), ...req.body });
+    if (nextAddress.isDefault) addresses.forEach((item: any) => { item.isDefault = false; });
+    Object.assign(address, nextAddress);
+    await user.save();
+    res.json({ success: true, data: user.addresses });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteAddress = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await User.findById(req.user!.id);
+    if (!user) throw new AppError('User not found', 404);
+    const addresses = user.addresses || [];
+    const address = (addresses as any).id(req.params.addressId);
+    if (!address) throw new AppError('Address not found', 404);
+    const wasDefault = address.isDefault;
+    address.deleteOne();
+    if (wasDefault && addresses[0]) (addresses[0] as any).isDefault = true;
+    await user.save();
+    res.json({ success: true, data: user.addresses });
   } catch (error) {
     next(error);
   }

@@ -8,6 +8,7 @@ import type { Order } from '@repo/types';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-store';
+import { useStore } from '@/lib/store-context';
 
 type OrdersResponse = {
   data: Order[];
@@ -29,20 +30,21 @@ const statusStyles: Record<string, string> = {
 export default function AccountOrdersPage() {
   const params = useParams<{ storeSlug: string }>();
   const { isAuthenticated } = useAuth();
+  const { store } = useStore();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!isAuthenticated) {
+      if (!isAuthenticated || !store?._id) {
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        const response = await api.get<OrdersResponse>('/orders');
+        const response = await api.get<OrdersResponse>(`/orders?storeId=${store._id}`);
         setOrders(Array.isArray(response.data) ? response.data : []);
       } catch (fetchError: any) {
         setError(fetchError.message || 'Failed to load orders');
@@ -52,7 +54,7 @@ export default function AccountOrdersPage() {
     };
 
     fetchOrders();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, store?._id]);
 
   if (!isAuthenticated) {
     return (
@@ -119,9 +121,10 @@ export default function AccountOrdersPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div
+            <Link
               key={order._id}
-              className="rounded-3xl border border-gray-100 dark:border-white/5 bg-white dark:bg-zinc-900 p-6 md:p-8 shadow-sm"
+              href={`/${params.storeSlug}/account/orders/${order._id}`}
+              className="block rounded-3xl border border-gray-100 dark:border-white/5 bg-white dark:bg-zinc-900 p-6 md:p-8 shadow-sm"
             >
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="space-y-2">
@@ -166,7 +169,7 @@ export default function AccountOrdersPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

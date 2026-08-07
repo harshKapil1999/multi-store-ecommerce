@@ -1,33 +1,39 @@
 import 'server-only';
 
-function getPrivateKey() {
-  return process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-}
+import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+const GOOGLE_SECURE_TOKEN_KEYS = createRemoteJWKSet(
+  new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com')
+);
+
+export type FirebaseIdToken = {
+  uid: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+};
 
 export async function verifyFirebaseIdToken(idToken: string) {
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
-  const privateKey = getPrivateKey();
 
-  if (!projectId || !clientEmail || !privateKey) {
-    throw new Error('Firebase Admin credentials are incomplete on the server.');
+  if (!projectId) {
+    throw new Error('Firebase project ID is not configured on the server.');
   }
 
-  // Load Firebase Admin only in the Node request path. This keeps the login
-  // endpoint responsive even when Vercel is warming a new serverless instance.
-  const [{ cert, getApps, initializeApp }, { getAuth }] = await Promise.all([
-    import('firebase-admin/app'),
-    import('firebase-admin/auth'),
-  ]);
-
-  const app = getApps()[0] || initializeApp({
-    credential: cert({
-      projectId,
-      clientEmail,
-      privateKey,
-    }),
-    projectId,
+  const { payload } = await jwtVerify(idToken, GOOGLE_SECURE_TOKEN_KEYS, {
+    algorithms: ['RS256'],
+    audience: projectId,
+    issuer: `https://securetoken.google.com/${projectId}`,
   });
 
-  return getAuth(app).verifyIdToken(idToken);
+  if (!payload.sub) {
+    throw new Error('Firebase ID token does not contain a user ID.');
+  }
+
+  return {
+    uid: payload.sub,
+    email: typeof payload.email === 'string' ? payload.email : undefined,
+    email_verified: payload.email_verified === true,
+    name: typeof payload.name === 'string' ? payload.name : undefined,
+  } satisfies FirebaseIdToken;
 }

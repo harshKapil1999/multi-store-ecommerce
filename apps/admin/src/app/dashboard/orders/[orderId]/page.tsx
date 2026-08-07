@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOrder, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { Button, Card, FormSelect, FormInput, FormTextarea } from '@/components/index';
-import { ArrowLeft, Package, User, MapPin, CreditCard, Loader2, Truck } from 'lucide-react';
+import { ArrowLeft, Package, User, MapPin, CreditCard, Loader2, Truck, Printer } from 'lucide-react';
 import type { OrderStatus, OrderItem, Order } from '@repo/types';
 import Image from 'next/image';
 
@@ -92,6 +92,9 @@ export default function OrderDetailPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="mr-2 h-4 w-4" /> Print invoice
+          </Button>
           <Button
             variant="ghost"
             size="sm"

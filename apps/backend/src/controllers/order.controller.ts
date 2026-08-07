@@ -25,12 +25,17 @@ const userOwnsStore = async (userId: string, storeId: string) => {
 
 export const getAllOrders = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, storeId } = req.query;
     const query: any = {};
+
+    if (storeId) query.storeId = String(storeId);
 
     // If customer, show only their orders
     if (req.user && req.user.role === 'customer') {
-      query['customer.userId'] = req.user.id;
+      query.$or = [
+        { 'customer.userId': req.user.id },
+        { 'customer.email': req.user.email.toLowerCase() },
+      ];
     }
 
     if (req.user?.role === 'store_owner') {
@@ -72,7 +77,8 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
     if (
       req.user &&
       req.user.role === 'customer' &&
-      order.customer.userId !== req.user.id
+      order.customer.userId !== req.user.id &&
+      order.customer.email.toLowerCase() !== req.user.email.toLowerCase()
     ) {
       throw new AppError('Not authorized to view this order', 403);
     }

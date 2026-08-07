@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store-context';
 import Link from 'next/link';
 import { NavDropdown } from './NavDropdown';
-import { Search, ShoppingBag, Heart, Menu, X } from 'lucide-react';
+import { Search, ShoppingBag, Heart, Menu, X, UserRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { CategoryWithChildren } from '@repo/types';
@@ -13,6 +13,8 @@ import { CartSidebar } from '../cart/CartSidebar';
 import { MobileSidebar } from './MobileSidebar';
 import { ThemeToggle } from './ThemeToggle';
 import { useWishlist } from '@/lib/wishlist-store';
+import { useAuth } from '@/lib/auth-store';
+import { OtpModal } from '@/components/auth/OtpModal';
 
 type SearchSuggestion = {
   _id: string;
@@ -31,9 +33,11 @@ export function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const router = useRouter();
   const { getItemCount } = useCart();
   const { items: wishlistItems } = useWishlist();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     if (store?._id) {
@@ -222,6 +226,16 @@ export function Navbar() {
             </button>
             
             <ThemeToggle />
+
+            {isAuthenticated ? (
+              <Link href={`/${store.slug}/account`} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Your account">
+                <UserRound className="h-6 w-6" />
+              </Link>
+            ) : (
+              <button type="button" onClick={() => setIsLoginOpen(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Sign in">
+                <UserRound className="h-6 w-6" />
+              </button>
+            )}
             
             <Link
               href={`/${store.slug}/wishlist`}
@@ -267,6 +281,8 @@ export function Navbar() {
         onClose={() => setIsMobileMenuOpen(false)} 
         categories={categories} 
       />
+
+      <OtpModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onSuccess={() => setIsLoginOpen(false)} />
 
       {isSearchOpen && (
         <div className="fixed inset-0 z-[80] bg-white text-black dark:bg-black dark:text-white md:hidden">

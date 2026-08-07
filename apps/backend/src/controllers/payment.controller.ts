@@ -7,6 +7,7 @@ import { AuthRequest } from '../middleware/auth';
 import { mailService } from '../services/mail.service';
 import { finalizeCapturedPayment } from '../services/order-fulfillment.service';
 import crypto from 'crypto';
+import { Store } from '../models/store.model';
 
 type WebhookRequest = Request & {
     rawBody?: string;
@@ -268,6 +269,15 @@ export const refundPayment = async (
             throw new AppError('Transaction not found', 404);
         }
 
+        if (req.user!.role === 'store_owner') {
+            const ownsStore = await Store.exists({ _id: transaction.storeId, owner: req.user!.id });
+            if (!ownsStore) throw new AppError('Not authorized to refund this transaction', 403);
+        }
+
+        if (transaction.status !== 'captured') {
+            throw new AppError('Only captured transactions can be refunded', 400);
+        }
+
         if (!transaction.razorpayPaymentId) {
             throw new AppError('No payment to refund', 400);
         }
@@ -284,9 +294,19 @@ export const refundPayment = async (
         // Update order
         const order = await Order.findById(transaction.orderId);
         if (order) {
+            const previousStatus = order.status;
             order.paymentStatus = 'refunded';
             order.status = 'refunded';
+            order.statusHistory = [
+                ...(order.statusHistory || []),
+                { status: 'refunded', at: new Date(), note: 'Payment refunded by the store.' },
+            ];
             await order.save();
+            try {
+                await mailService.sendOrderStatusUpdate(order.customer.email, order, previousStatus);
+            } catch (mailError) {
+                console.error('Error sending refund email:', mailError);
+            }
         }
 
         res.json({

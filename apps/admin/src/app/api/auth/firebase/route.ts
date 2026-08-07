@@ -27,6 +27,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Firebase user email is required' }, { status: 400 });
     }
 
+    if (!decodedToken.email_verified) {
+      return NextResponse.json({ message: 'Verify your email before accessing admin' }, { status: 403 });
+    }
+
     const allowedAdminEmails = getAllowedAdminEmails();
     if (allowedAdminEmails.length === 0) {
       return NextResponse.json({ message: 'FIREBASE_ADMIN_EMAILS is not configured' }, { status: 500 });
@@ -52,7 +56,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[Firebase Auth] Session exchange failed:', error);
-    const isConfigurationError = /credentials are incomplete|session signing is not configured/i.test(error?.message || '');
+    const isConfigurationError = /project ID is not configured|session signing is not configured/i.test(error?.message || '');
     return NextResponse.json(
       {
         message: isConfigurationError

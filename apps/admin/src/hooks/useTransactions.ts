@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { apiClient } from '../lib/api-client';
-import type { Transaction } from '@repo/types';
 
 export const TRANSACTIONS_QUERY_KEY = ['transactions'];
 
@@ -36,5 +36,20 @@ export const useTransaction = (transactionId: string) => {
             return data;
         },
         enabled: !!transactionId,
+    });
+};
+
+export const useRefundTransaction = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (transactionId: string) => {
+            const { data } = await apiClient.post('/payment/refund', { transactionId });
+            return data;
+        },
+        onSuccess: () => {
+            toast.success('Refund initiated successfully');
+            queryClient.invalidateQueries({ queryKey: TRANSACTIONS_QUERY_KEY });
+        },
+        onError: (error: any) => toast.error(error.response?.data?.message || 'Refund failed'),
     });
 };

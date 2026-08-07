@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import * as orderController from '../controllers/order.controller';
-import { authenticate, authorize } from '../middleware/auth';
+import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth';
 
 const router: Router = Router();
 
 // Public routes
-router.post('/', orderController.createOrder); // Guest checkout supported
+router.post('/', optionalAuthenticate, orderController.createOrder); // Guest checkout supported
 router.get('/track/:id', orderController.trackOrder);
 
 // Protected routes

@@ -4,7 +4,7 @@ export interface User {
   email: string;
   name: string;
   role: 'customer' | 'admin' | 'store_owner';
-  addresses?: Address[];
+  addresses?: UserAddress[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -309,6 +309,11 @@ export interface Address {
   country: string;
   postalCode: string;
   phone?: string;
+}
+
+export interface UserAddress extends Address {
+  _id?: string;
+  isDefault?: boolean;
 }
 
 // Cart Types
