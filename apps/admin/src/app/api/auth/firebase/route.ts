@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSession } from '@/lib/session';
+import {
+  ADMIN_SESSION_COOKIE,
+  createSessionToken,
+  getSessionCookieOptions,
+} from '@/lib/session';
 import { verifyFirebaseIdToken } from '@/lib/firebase/admin';
 
 export const runtime = 'nodejs';
@@ -37,9 +41,8 @@ export async function POST(request: NextRequest) {
     }
 
     const role = 'admin';
-    await createSession(decodedToken.uid, email, role);
-
-    return NextResponse.json({
+    const { token, expiresAt } = await createSessionToken(decodedToken.uid, email, role);
+    const response = NextResponse.json({
       success: true,
       data: {
         user: {
@@ -50,6 +53,9 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+    response.cookies.set(ADMIN_SESSION_COOKIE, token, getSessionCookieOptions(expiresAt));
+
+    return response;
   } catch (error: any) {
     console.error('[Firebase Auth] Session exchange failed:', error);
     const isConfigurationError = /project ID is not configured|session signing is not configured/i.test(error?.message || '');

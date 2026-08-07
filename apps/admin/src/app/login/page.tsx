@@ -50,7 +50,8 @@ export default function LoginPage() {
     const idToken = await credential.user.getIdToken();
     const user = await createAdminSession(idToken);
     setUser(user);
-    router.push('/dashboard');
+    router.replace('/dashboard');
+    router.refresh();
   };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {

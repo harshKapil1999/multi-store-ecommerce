@@ -1,19 +1,25 @@
-import { X, ChevronRight, ChevronDown } from 'lucide-react';
+import { X, ChevronRight, ChevronDown, Heart, UserRound } from 'lucide-react';
 import Link from 'next/link';
 import { useStore } from '@/lib/store-context';
 import { CategoryWithChildren } from '@repo/types';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/Button';
+import { ThemeToggle } from './ThemeToggle';
+import { useAuth } from '@/lib/auth-store';
+import { useWishlist } from '@/lib/wishlist-store';
 
 interface MobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   categories: CategoryWithChildren[];
+  onSignIn: () => void;
 }
 
-export function MobileSidebar({ isOpen, onClose, categories }: MobileSidebarProps) {
+export function MobileSidebar({ isOpen, onClose, categories, onSignIn }: MobileSidebarProps) {
   const { store } = useStore();
+  const { isAuthenticated } = useAuth();
+  const { items: wishlistItems } = useWishlist();
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
 
   // Lock body scroll when sidebar is open
@@ -39,6 +45,7 @@ export function MobileSidebar({ isOpen, onClose, categories }: MobileSidebarProp
   };
 
   const topLevelCategories = categories.filter(cat => !cat.parentId);
+  const wishlistCount = wishlistItems.filter((item) => item.storeId === store._id).length;
 
   return (
     <>
@@ -63,6 +70,7 @@ export function MobileSidebar({ isOpen, onClose, categories }: MobileSidebarProp
           <button 
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
+            aria-label="Close navigation menu"
           >
             <X className="w-6 h-6" />
           </button>
@@ -96,6 +104,7 @@ export function MobileSidebar({ isOpen, onClose, categories }: MobileSidebarProp
                         toggleCategory(category._id);
                       }}
                       className="p-3 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg"
+                      aria-label={`${expandedCategories.includes(category._id) ? 'Collapse' : 'Expand'} ${category.name}`}
                     >
                       {expandedCategories.includes(category._id) ? (
                         <ChevronDown className="w-5 h-5" />
@@ -138,18 +147,24 @@ export function MobileSidebar({ isOpen, onClose, categories }: MobileSidebarProp
           </nav>
         </div>
 
-        <div className="p-4 border-t border-gray-100 dark:border-white/10 space-y-4">
-            <div className="flex flex-col gap-3">
-                <Button variant="outline" className="w-full justify-start rounded-full">
-                    Find a Store
-                </Button>
-                <Button variant="outline" className="w-full justify-start rounded-full">
-                    Help
-                </Button>
-                <Button className="w-full rounded-full">
-                    Join Us / Sign In
-                </Button>
-            </div>
+        <div className="space-y-3 border-t border-gray-100 p-4 dark:border-white/10">
+          <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-2 dark:border-white/10">
+            <span className="text-sm font-semibold">Appearance</span>
+            <ThemeToggle />
+          </div>
+          <Link href={`/${store.slug}/wishlist`} onClick={onClose} className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3 text-sm font-semibold dark:border-white/10">
+            <span className="flex items-center gap-3"><Heart className="h-5 w-5" /> Wishlist</span>
+            {wishlistCount > 0 && <span>{wishlistCount}</span>}
+          </Link>
+          {isAuthenticated ? (
+            <Link href={`/${store.slug}/account`} onClick={onClose} className="flex items-center gap-3 rounded-md bg-black px-4 py-3 text-sm font-semibold text-white dark:bg-white dark:text-black">
+              <UserRound className="h-5 w-5" /> Your account
+            </Link>
+          ) : (
+            <Button className="w-full justify-start rounded-md" onClick={onSignIn}>
+              <UserRound className="mr-3 h-5 w-5" /> Sign in
+            </Button>
+          )}
         </div>
       </div>
     </>

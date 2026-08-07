@@ -205,6 +205,22 @@ gcloud run deploy "$SERVICE" \
   --quiet
 ```
 
+Keep one warm Mumbai instance for checkout and webhook traffic, while allowing
+Cloud Run to add instances under load:
+
+```bash
+gcloud run services update "$SERVICE" \
+  --project "$PROJECT_ID" \
+  --region "$REGION" \
+  --min 1 \
+  --quiet
+```
+
+The minimum instance avoids scale-to-zero cold starts; it does not replace
+idempotent payment handling. Razorpay webhooks, MongoDB uniqueness constraints,
+and the backend payment-finalization claim remain the source of truth when a
+browser disconnects or Razorpay retries an event.
+
 Supplying only the new image preserves the service's existing secrets,
 service account, scaling, port, CORS configuration, and public IAM policy.
 Inspect the generated revision before moving on.

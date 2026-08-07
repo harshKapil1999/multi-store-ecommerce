@@ -1,13 +1,13 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
-
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  // Keep browser requests on the admin origin. The route handler validates the
+  // HTTP-only admin session before forwarding the request to the backend.
+  baseURL: '/api/backend',
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Send cookies with requests
+  withCredentials: true,
 });
 
 // Response interceptor for error handling

@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import helmet from 'helmet';
+import mongoose from 'mongoose';
 import { connectDB } from './config/database';
 import { errorHandler } from './middleware/error-handler';
 import { validateStoreContext } from './middleware/store-context';
@@ -47,9 +48,6 @@ if (process.env.NODE_ENV === 'production') {
 
 const app: Application = express();
 const PORT = process.env.PORT || 4000;
-
-// Connect to MongoDB
-connectDB();
 
 // Middleware
 app.disable('x-powered-by');
@@ -103,7 +101,11 @@ app.get('/', (req, res) => {
 });
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Server is running' });
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({
+    status: databaseReady ? 'ok' : 'degraded',
+    database: databaseReady ? 'connected' : 'unavailable',
+  });
 });
 
 // Store Management API
@@ -137,8 +139,35 @@ app.use((_req, res) => {
 // Error handling
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+async function startServer() {
+  await connectDB();
+
+  const server = app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  const shutdown = (signal: string) => {
+    console.log(`${signal} received; draining HTTP requests.`);
+    const forceExit = setTimeout(() => process.exit(1), 9_000);
+    forceExit.unref();
+
+    server.close(async (error) => {
+      try {
+        await mongoose.disconnect();
+      } finally {
+        clearTimeout(forceExit);
+        process.exit(error ? 1 : 0);
+      }
+    });
+  };
+
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
+}
+
+startServer().catch((error) => {
+  console.error('Backend startup failed:', error);
+  process.exit(1);
 });
 
 export default app;

@@ -35,6 +35,7 @@ export default function CheckoutPage() {
   const [pendingOnlineOrder, setPendingOnlineOrder] = useState<PendingOnlineOrder | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [saveAddressForFuture, setSaveAddressForFuture] = useState(true);
 
   const [formData, setFormData] = useState({
     firstName: user?.name.split(' ')[0] || '',
@@ -151,6 +152,34 @@ export default function CheckoutPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (['firstName', 'lastName', 'phone', 'address', 'address2', 'city', 'pincode', 'state'].includes(e.target.name)) {
+      setSelectedAddressId('');
+    }
+  };
+
+  const persistCheckoutAddress = async () => {
+    if (!isAuthenticated || selectedAddressId || !saveAddressForFuture) return;
+
+    try {
+      const addresses = await api.post<UserAddress[]>('/auth/addresses', {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        address1: formData.address,
+        address2: formData.address2,
+        city: formData.city,
+        state: formData.state,
+        country: 'India',
+        postalCode: formData.pincode,
+        phone: formData.phone,
+        isDefault: savedAddresses.length === 0,
+      });
+      setSavedAddresses(addresses);
+      const saved = addresses[addresses.length - 1];
+      if (saved?._id) setSelectedAddressId(saved._id);
+    } catch (error) {
+      console.error('Unable to save checkout address:', error);
+      toast.message('Your order can continue, but the address could not be saved to your account.');
+    }
   };
 
   const processOrder = async () => {
@@ -200,6 +229,7 @@ export default function CheckoutPage() {
         order = pendingOnlineOrder;
       } else {
         order = await api.post<PendingOnlineOrder>('/orders', orderPayload);
+        await persistCheckoutAddress();
 
         if (paymentMethod === 'razorpay') {
           setPendingOnlineOrder(order);
@@ -425,6 +455,17 @@ export default function CheckoutPage() {
                   value={formData.address2}
                   onChange={handleInputChange}
                 />
+                {isAuthenticated && !selectedAddressId && (
+                  <label className="flex items-center gap-3 py-2 text-sm font-medium">
+                    <input
+                      type="checkbox"
+                      checked={saveAddressForFuture}
+                      onChange={(event) => setSaveAddressForFuture(event.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    Save this address for future orders
+                  </label>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input required name="city" placeholder="City" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.city} onChange={handleInputChange} />
                   <input required name="pincode" placeholder="Pincode" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.pincode} onChange={handleInputChange} />

@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  sendPasswordResetEmail,
   signOut,
   type Auth,
   type UserCredential,
@@ -51,4 +52,8 @@ export async function signInAdminWithGoogle(): Promise<UserCredential> {
 
 export async function signOutAdminFromFirebase() {
   await signOut(getFirebaseAuth());
+}
+
+export async function sendAdminPasswordReset(email: string) {
+  await sendPasswordResetEmail(getFirebaseAuth(), email);
 }

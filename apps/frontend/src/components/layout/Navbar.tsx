@@ -78,6 +78,16 @@ export function Navbar() {
     };
   }, [searchQuery, store?._id]);
 
+  useEffect(() => {
+    if (!isSearchOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isSearchOpen]);
+
   if (isLoading || !store) return null;
 
   // Filter only top-level categories (those without parentId)
@@ -111,6 +121,10 @@ export function Navbar() {
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
+    goToSearchResults();
+  };
+
+  const goToSearchResults = () => {
     const query = searchQuery.trim();
     if (query) {
       setIsSearchOpen(false);
@@ -123,7 +137,7 @@ export function Navbar() {
 
     return (
       <div className={mobile
-        ? 'mt-4 overflow-hidden border-y border-gray-200 dark:border-white/10'
+        ? 'h-full overflow-y-auto border-t border-gray-200 bg-white dark:border-white/10 dark:bg-black'
         : 'absolute right-0 top-12 w-96 overflow-hidden rounded-md border border-gray-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-950'
       }>
         {isSearching ? (
@@ -149,7 +163,7 @@ export function Navbar() {
               </li>
             ))}
             <li>
-              <button type="submit" className="w-full px-4 py-3 text-left text-sm font-semibold hover:bg-gray-50 dark:hover:bg-white/5">
+              <button type="button" onClick={goToSearchResults} className="w-full px-4 py-4 text-left text-sm font-semibold hover:bg-gray-50 dark:hover:bg-white/5">
                 View all results for “{searchQuery.trim()}”
               </button>
             </li>
@@ -166,9 +180,9 @@ export function Navbar() {
       <header className="fixed top-0 w-full z-50 bg-white dark:bg-black border-b border-gray-100 dark:border-white/10 transition-colors duration-300">
         <div className="container mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
-          <Link href={`/${store.slug}`} className="flex items-center gap-2 z-50">
+          <Link href={`/${store.slug}`} className="z-50 flex max-w-[96px] items-center gap-2 md:max-w-none">
             {store.logo ? (
-              <img src={store.logo} alt={store.name} className="h-8 w-auto" />
+              <img src={store.logo} alt={store.name} className="h-8 max-w-full object-contain" />
             ) : (
               <span className="text-2xl font-black tracking-tighter uppercase italic transform -skew-x-12">
                 {store.name}
@@ -225,34 +239,37 @@ export function Navbar() {
               <Search className="h-6 w-6" />
             </button>
             
-            <ThemeToggle />
+            <div className="hidden items-center gap-1 md:flex">
+              <ThemeToggle />
 
-            {isAuthenticated ? (
-              <Link href={`/${store.slug}/account`} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Your account">
-                <UserRound className="h-6 w-6" />
-              </Link>
-            ) : (
-              <button type="button" onClick={() => setIsLoginOpen(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Sign in">
-                <UserRound className="h-6 w-6" />
-              </button>
-            )}
-            
-            <Link
-              href={`/${store.slug}/wishlist`}
-              className="relative p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
-              aria-label={`Wishlist with ${wishlistCount} items`}
-            >
-              <Heart className="w-6 h-6" />
-              {wishlistCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-xs font-semibold text-white dark:bg-white dark:text-black">
-                  {wishlistCount}
-                </span>
+              {isAuthenticated ? (
+                <Link href={`/${store.slug}/account`} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Your account">
+                  <UserRound className="h-6 w-6" />
+                </Link>
+              ) : (
+                <button type="button" onClick={() => setIsLoginOpen(true)} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors" aria-label="Sign in">
+                  <UserRound className="h-6 w-6" />
+                </button>
               )}
-            </Link>
+
+              <Link
+                href={`/${store.slug}/wishlist`}
+                className="relative p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
+                aria-label={`Wishlist with ${wishlistCount} items`}
+              >
+                <Heart className="w-6 h-6" />
+                {wishlistCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black text-xs font-semibold text-white dark:bg-white dark:text-black">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+            </div>
             
             <button 
               onClick={() => setIsCartOpen(true)}
               className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors relative"
+              aria-label={`Open bag with ${itemCount} items`}
             >
               <ShoppingBag className="w-6 h-6" />
               {itemCount > 0 && (
@@ -265,6 +282,7 @@ export function Navbar() {
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-full transition-colors"
+              aria-label="Open navigation menu"
             >
               <Menu className="w-6 h-6" />
             </button>
@@ -280,14 +298,18 @@ export function Navbar() {
         isOpen={isMobileMenuOpen} 
         onClose={() => setIsMobileMenuOpen(false)} 
         categories={categories} 
+        onSignIn={() => {
+          setIsMobileMenuOpen(false);
+          setIsLoginOpen(true);
+        }}
       />
 
       <OtpModal isOpen={isLoginOpen} onClose={() => setIsLoginOpen(false)} onSuccess={() => setIsLoginOpen(false)} />
 
       {isSearchOpen && (
-        <div className="fixed inset-0 z-[80] bg-white text-black dark:bg-black dark:text-white md:hidden">
-          <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-4 dark:border-white/10">
-            <form onSubmit={handleSearch} role="search" className="relative flex-1">
+        <div className="fixed inset-0 z-[80] flex h-[100dvh] flex-col overflow-hidden bg-white text-black dark:bg-black dark:text-white md:hidden">
+          <div className="flex min-h-16 shrink-0 items-center gap-2 border-b border-gray-200 px-3 dark:border-white/10">
+            <form onSubmit={handleSearch} role="search" className="relative min-w-0 flex-1">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500" />
               <input
                 autoFocus
@@ -295,13 +317,17 @@ export function Navbar() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder={`Search ${store.name}`}
-                className="w-full rounded-full border-0 bg-gray-100 py-3 pl-12 pr-4 text-base outline-none ring-0 dark:bg-white/10"
+                className="w-full rounded-full border-0 bg-gray-100 py-3 pl-11 pr-4 text-base outline-none ring-0 dark:bg-white/10"
               />
-              {searchSuggestions(true)}
             </form>
-            <button type="button" onClick={() => setIsSearchOpen(false)} className="p-2" aria-label="Close search">
+            <button type="button" onClick={() => setIsSearchOpen(false)} className="shrink-0 rounded-full p-2 hover:bg-gray-100 dark:hover:bg-white/10" aria-label="Close search">
               <X className="h-6 w-6" />
             </button>
+          </div>
+          <div className="min-h-0 flex-1">
+            {searchQuery.trim().length >= 2 ? searchSuggestions(true) : (
+              <div className="px-5 py-8 text-sm text-gray-500">Start typing to find products in this store.</div>
+            )}
           </div>
         </div>
       )}
