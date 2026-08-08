@@ -23,6 +23,7 @@ import newsletterRoutes from './routes/newsletter.routes';
 import variantRoutes from './routes/variant.routes';
 import transactionRoutes from './routes/transaction.routes';
 import paymentRoutes from './routes/payment.routes';
+import customerRoutes from './routes/customer.routes';
 import { apiRateLimit } from './middleware/rate-limit';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -117,6 +118,7 @@ app.use('/api/v1/stores/:storeId/categories', validateStoreContext, categoryRout
 app.use('/api/v1/stores/:storeId/products', validateStoreContext, productRoutes);
 app.use('/api/v1/stores/:storeId/pages', validateStoreContext, pageRoutes);
 app.use('/api/v1/stores/:storeId/newsletter', validateStoreContext, newsletterRoutes);
+app.use('/api/v1/stores/:storeId/customers', validateStoreContext, customerRoutes);
 
 // Other routes
 app.use('/api/v1/orders', orderRoutes);

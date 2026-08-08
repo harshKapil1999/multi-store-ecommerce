@@ -38,7 +38,7 @@ const storeSchema = z.object({
   }).optional(),
   homeSections: z.array(z.object({
     id: z.string(),
-    type: z.enum(['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'newsletter']),
+    type: z.enum(['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'editorial_spotlight', 'newsletter']),
     title: z.string().min(1),
     subtitle: z.string().optional(),
     isVisible: z.boolean(),
@@ -322,12 +322,13 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
           <div className="space-y-4">
             {homeSections.map((section: HomeSectionConfig, index: number) => {
               const usesCategories = section.type === 'featured_categories' || section.type === 'category_collection';
-              const usesProducts = section.type === 'spotlight' || section.type === 'featured_products';
+              const usesProducts = section.type === 'spotlight' || section.type === 'featured_products' || section.type === 'editorial_spotlight';
               const sectionLabel = {
                 featured_categories: 'Featured category stories',
                 category_collection: 'Shop by collection',
                 spotlight: 'Spotlight carousel',
                 featured_products: 'Featured product grid',
+                editorial_spotlight: 'Spotlight product wall',
                 newsletter: 'Newsletter / Join now',
               }[section.type];
 

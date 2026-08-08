@@ -12,7 +12,7 @@ const navLinkSchema = z.object({
 });
 const homeSectionSchema = z.object({
   id: z.string().min(1).max(80),
-  type: z.enum(['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'newsletter']),
+  type: z.enum(['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'editorial_spotlight', 'newsletter']),
   title: z.string().min(1).max(120),
   subtitle: z.string().max(300).optional().or(z.literal('')),
   isVisible: z.boolean(),

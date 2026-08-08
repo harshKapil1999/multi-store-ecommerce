@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSelectedStore } from '@/contexts/store-context';
 import { useOrders } from '@/hooks/useOrders';
 import { DataTable, Button, Card, FormSelect } from '@/components/index';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef, PaginationState } from '@tanstack/react-table';
 import type { Order, OrderStatus } from '@repo/types';
 import { Eye, Package } from 'lucide-react';
 
@@ -23,12 +23,16 @@ export default function OrdersPage() {
   const router = useRouter();
   const { selectedStoreId } = useSelectedStore();
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 20 });
   
   const { data, isLoading } = useOrders(selectedStoreId || undefined, {
     status: statusFilter ? (statusFilter as OrderStatus) : undefined,
+    page: pagination.pageIndex + 1,
+    limit: pagination.pageSize,
   });
 
-  const orders = (data?.data?.data || []) as Order[];
+  const orders = (data?.data || []) as Order[];
+  const orderCount = data?.total || orders.length;
 
   const columns: ColumnDef<Order>[] = [
     {
@@ -158,7 +162,7 @@ export default function OrdersPage() {
         <div className="flex items-center gap-2">
           <Package className="h-5 w-5 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            {orders.length} order(s)
+            {orderCount} order(s)
           </span>
         </div>
       </div>
@@ -177,7 +181,10 @@ export default function OrdersPage() {
               { value: 'refunded', label: 'Refunded' },
             ]}
             value={statusFilter}
-            onValueChange={setStatusFilter}
+            onValueChange={(value) => {
+              setStatusFilter(value);
+              setPagination((current) => ({ ...current, pageIndex: 0 }));
+            }}
           />
         </div>
 
@@ -185,6 +192,10 @@ export default function OrdersPage() {
           columns={columns}
           data={orders}
           isLoading={isLoading}
+          pageIndex={pagination.pageIndex}
+          pageSize={pagination.pageSize}
+          pageCount={data?.totalPages || 1}
+          onPaginationChange={setPagination}
         />
       </Card>
     </div>

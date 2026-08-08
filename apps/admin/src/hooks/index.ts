@@ -19,5 +19,8 @@ export * from './useMedia';
 // Order Hooks
 export * from './useOrders';
 
+// Customer Hooks
+export * from './useCustomers';
+
 // Transaction Hooks
 export * from './useTransactions';

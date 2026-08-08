@@ -38,6 +38,7 @@ export type HomeSectionType =
   | 'category_collection'
   | 'spotlight'
   | 'featured_products'
+  | 'editorial_spotlight'
   | 'newsletter';
 
 export interface HomeSectionConfig {
@@ -60,7 +61,8 @@ export const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
   { id: 'shop-by-collection', type: 'category_collection', title: 'Shop by Collection', isVisible: true, order: 1, categoryIds: [], limit: 6, layout: 'carousel' },
   { id: 'spotlight', type: 'spotlight', title: 'Spotlight', isVisible: true, order: 2, productIds: [], limit: 8, layout: 'carousel' },
   { id: 'featured-products', type: 'featured_products', title: 'Featured Products', isVisible: false, order: 3, productIds: [], limit: 8, layout: 'grid' },
-  { id: 'newsletter', type: 'newsletter', title: 'Join our community', subtitle: 'Sign up for product releases, store news, and member updates.', isVisible: true, order: 4, buttonLabel: 'Join now', consentText: 'You can unsubscribe at any time.' },
+  { id: 'editorial-spotlight', type: 'editorial_spotlight', title: 'Spotlight', subtitle: 'Discover standout products selected for this store.', isVisible: true, order: 4, productIds: [], limit: 16, layout: 'grid' },
+  { id: 'newsletter', type: 'newsletter', title: 'Join our community', subtitle: 'Sign up for product releases, store news, and member updates.', isVisible: true, order: 5, buttonLabel: 'Join now', consentText: 'You can unsubscribe at any time.' },
 ];
 
 export interface StoreTheme {
@@ -314,6 +316,30 @@ export interface Address {
 export interface UserAddress extends Address {
   _id?: string;
   isDefault?: boolean;
+}
+
+export interface CustomerSummary {
+  id: string;
+  email: string;
+  name: string;
+  phone?: string;
+  userId?: string;
+  orderCount: number;
+  totalSpent: number;
+  lastOrderAt: Date;
+  lastOrderStatus: OrderStatus;
+  latestShippingAddress?: Address;
+}
+
+export interface CustomerAddress extends Address {
+  source: 'shipping' | 'billing';
+  lastUsedAt: Date;
+}
+
+export interface CustomerDetail extends CustomerSummary {
+  firstOrderAt: Date;
+  addresses: CustomerAddress[];
+  orders: Order[];
 }
 
 // Cart Types

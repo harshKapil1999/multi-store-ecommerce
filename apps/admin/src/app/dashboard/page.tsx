@@ -36,7 +36,7 @@ export default function Dashboard() {
   const ordersList = Array.isArray(ordersData?.data) ? ordersData.data : [];
   const transactionsList = Array.isArray(transactionsData) ? transactionsData : [];
 
-  const orderCount = ordersList.length; // Approximate if not paginated fully, or use pagination total if available
+  const orderCount = ordersData?.total || ordersList.length;
   const totalRevenue = transactionsList
     .filter((t: any) => t.status === 'captured')
     .reduce((acc: number, t: any) => acc + t.amount, 0);

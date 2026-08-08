@@ -16,6 +16,7 @@ export const useOrders = (storeId?: string, filters?: Partial<OrderFilters>) => 
       const { data } = await apiClient.get(endpoint, { params: filters });
       return data.data;
     },
+    enabled: !!storeId,
   });
 };
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { StoreSwitcher, Button } from '@/components/index';
-import { Menu, X, Home, Package, Grid3x3, Image, ShoppingCart, LogOut, Loader2, FileText, Moon, Sun, User, CreditCard, Info } from 'lucide-react';
+import { Menu, X, Home, Package, Grid3x3, Image, ShoppingCart, LogOut, Loader2, FileText, Moon, Sun, User, Users, CreditCard, Info } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/theme-context';
 import { logoutAction } from '@/lib/actions/auth';
@@ -83,6 +83,7 @@ export default function DashboardLayout({
     { name: 'Categories', href: '/dashboard/categories', icon: Grid3x3 },
     { name: 'Products', href: '/dashboard/products', icon: Package },
     { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
+    { name: 'Customers', href: '/dashboard/customers', icon: Users },
     { name: 'Transactions', href: '/dashboard/transactions', icon: CreditCard },
     { name: 'Pages', href: '/dashboard/pages', icon: FileText },
     { name: 'Profile', href: '/dashboard/profile', icon: User },
@@ -94,6 +95,7 @@ export default function DashboardLayout({
     { path: '/dashboard/categories', title: 'Categories', text: 'Builds storefront navigation and collection pages. Parent categories create menu groups; inactive categories stay hidden.' },
     { path: '/dashboard/products', title: 'Products', text: 'Controls customer-visible catalog data, pricing, inventory, media order, attributes, variants, and spotlight eligibility.' },
     { path: '/dashboard/orders', title: 'Orders', text: 'Use this for fulfilment. Status changes are visible to customers and send transactional updates.' },
+    { path: '/dashboard/customers', title: 'Customers', text: 'Store-scoped customer profiles derived from checkout history, including contact details, addresses used, orders, and spend.' },
     { path: '/dashboard/transactions', title: 'Transactions', text: 'Payment-provider records for reconciliation. Captured payments should map to exactly one paid order.' },
     { path: '/dashboard/pages', title: 'Pages', text: 'Create store-specific content and legal pages. Only published pages and visible sections appear in the storefront.' },
     { path: '/dashboard/profile', title: 'Profile', text: 'Review the authenticated administrator account. Password and identity changes are managed by Firebase Authentication.' },

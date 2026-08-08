@@ -2,6 +2,7 @@ import { api } from '@/lib/api';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeaturedCategories } from '@/components/home/FeaturedCategories';
 import { ProductSpotlight } from '@/components/home/ProductSpotlight';
+import { EditorialSpotlight } from '@/components/home/EditorialSpotlight';
 import { NewsletterSection } from '@/components/home/NewsletterSection';
 import { ProductGrid } from '@/components/shop/ProductGrid';
 import { DEFAULT_HOME_SECTIONS, Product, CategoryWithChildren, Store, HomeSectionConfig } from '@repo/types';
@@ -211,6 +212,22 @@ export default async function StorePage({ params }: PageProps) {
                   <ProductGrid products={selected} storeSlug={storeSlug} />
                 </div>
               </section>
+            );
+          }
+
+          if (section.type === 'editorial_spotlight') {
+            const featured = products.filter((product) => product.isFeatured);
+            const featuredIds = new Set(featured.map((product) => product._id));
+            const fallback = [...featured, ...products.filter((product) => !featuredIds.has(product._id))];
+            const selected = selectConfiguredItems(products, section.productIds, fallback, limit);
+            return (
+              <EditorialSpotlight
+                key={section.id}
+                title={section.title}
+                subtitle={section.subtitle}
+                products={selected}
+                storeSlug={storeSlug}
+              />
             );
           }
 

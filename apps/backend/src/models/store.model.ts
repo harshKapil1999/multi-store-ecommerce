@@ -81,7 +81,7 @@ const storeSchema = new Schema<IStore>(
       type: {
         type: String,
         required: true,
-        enum: ['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'newsletter'],
+        enum: ['featured_categories', 'category_collection', 'spotlight', 'featured_products', 'editorial_spotlight', 'newsletter'],
       },
       title: { type: String, required: true },
       subtitle: String,
