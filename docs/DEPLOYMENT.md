@@ -308,8 +308,9 @@ Admin production environment:
 
 ```text
 NEXT_PUBLIC_API_URL=https://shopbackend.crabtile.com/api/v1
+BACKEND_API_URL=https://crabtile-shop-backend-jtol2jufsq-el.a.run.app/api/v1
 NEXT_PUBLIC_FRONTEND_URL=https://shop.crabtile.com
-SESSION_SECRET=<secret>
+SESSION_SECRET=<same value as the Cloud Run backend-session-secret>
 NEXT_PUBLIC_FIREBASE_API_KEY=<Firebase web config>
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=<Firebase web config>
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=<Firebase web config>
@@ -323,7 +324,13 @@ FIREBASE_ADMIN_EMAILS=<comma-separated allowlist>
 Firebase web configuration values are public identifiers. The server verifies
 Firebase ID tokens against Google's published signing keys, so no Firebase
 service-account private key is required by the admin deployment. The session
-secret is private and must remain encrypted in Vercel.
+secret is private and must remain encrypted in Vercel. The admin API bridge
+uses `BACKEND_API_URL` for authenticated server-to-server requests. Keep it on
+the canonical Cloud Run origin rather than the Firebase Hosting custom domain,
+which is intended for public browser traffic and may cache unauthenticated GET
+responses. A `SESSION_SECRET` mismatch causes Firebase sign-in to succeed and
+the dashboard to immediately redirect back to `/login` when its first protected
+backend request receives `401`.
 
 ## Frontend and admin: deploy future changes
 
