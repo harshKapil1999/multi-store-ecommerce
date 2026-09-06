@@ -1,3 +1,8 @@
+import mongoose from 'mongoose';
+import { createHash } from 'node:crypto';
+import { checkoutSchema } from '../validators/checkout.schema';
+import { changeInventory } from '../services/inventory.service';
+import { getShipping, DEFAULT_COMMERCE_SETTINGS, ORDER_TRANSITIONS, type OrderItem } from '@repo/types';
 import { Request, Response, NextFunction } from 'express';
 import { Order } from '../models/order.model';
 import { Product } from '../models/product.model';
@@ -44,8 +49,8 @@ export const getAllOrders = async (req: AuthRequest, res: Response, next: NextFu
     }
 
     const orders = await Order.find(query)
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit))
+      .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
+      .skip((Math.max(1, Math.floor(Number(page) || 1)) - 1) * Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
       .sort({ createdAt: -1 });
 
     const total = await Order.countDocuments(query);
@@ -93,28 +98,7 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
-export const trackOrder = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const email = String(req.query.email || '').trim().toLowerCase();
-
-    if (!email) {
-      throw new AppError('Email is required to track this order', 400);
-    }
-
-    const order = await Order.findOne({
-      _id: req.params.id,
-      'customer.email': email,
-    });
-
-    if (!order) {
-      throw new AppError('Order not found', 404);
-    }
-
-    res.json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
-};
+export const trackOrder = getOrderById;
 
 export const getOrdersByStore = async (
   req: AuthRequest,
@@ -133,8 +117,8 @@ export const getOrdersByStore = async (
     }
 
     const orders = await Order.find(query)
-      .limit(Number(limit))
-      .skip((Number(page) - 1) * Number(limit))
+      .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
+      .skip((Math.max(1, Math.floor(Number(page) || 1)) - 1) * Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
       .sort({ createdAt: -1 });
 
     const total = await Order.countDocuments(query);
@@ -154,160 +138,79 @@ export const getOrdersByStore = async (
   }
 };
 
-export const createOrder = async (req: Request, res: Response, next: NextFunction) => {
+export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { storeId, items, customer, shippingAddress, billingAddress, paymentMethod } = req.body;
-    const authReq = req as AuthRequest;
-
-    if (!storeId || !Array.isArray(items) || items.length === 0) {
-      throw new AppError('Store and at least one order item are required', 400);
+    const parsed = checkoutSchema.safeParse(req.body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || 'Invalid checkout data', 400);
+    const { storeId, items, customer, shippingAddress, billingAddress, paymentMethod, checkoutKey } = parsed.data;
+    if (customer.email !== req.user!.email.toLowerCase()) throw new AppError('Verify the email used for this order.', 403);
+    const fingerprint = createHash('sha256').update(JSON.stringify(parsed.data)).digest('hex');
+    const previous = await Order.findOne({ checkoutKey }).select('+checkoutFingerprint');
+    if (previous) {
+      if (previous.customer.userId !== req.user!.id || previous.checkoutFingerprint !== fingerprint) throw new AppError('Checkout changed. Please start a new checkout.', 409);
+      return res.json({ success: true, data: previous });
     }
-
-    const store = await Store.findOne({ _id: storeId, isActive: true }).select('_id').lean();
-    if (!store) {
-      throw new AppError('Store not found or inactive', 404);
-    }
-
-    // Validate products and calculate totals
-    let subtotal = 0;
-    const orderItems = [];
-
-    for (const item of items) {
-      const quantity = Number(item.quantity);
-      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
-        throw new AppError('Item quantity must be between 1 and 20', 400);
-      }
-
-      const product = await Product.findOne({
-        _id: item.productId,
-        storeId,
-        isActive: true,
+    const store = await Store.findOne({ _id: storeId, isActive: true }).lean();
+    if (!store) throw new AppError('Store not found or inactive', 404);
+    const settings = { ...DEFAULT_COMMERCE_SETTINGS, ...store.commerce };
+    if (paymentMethod === 'cod' && !settings.codEnabled) throw new AppError('Cash on delivery is unavailable for this store.', 400);
+    const session = await mongoose.startSession();
+    let order: InstanceType<typeof Order> | undefined;
+    try {
+      await session.withTransaction(async () => {
+        const orderItems: (OrderItem & { selectedAttributes?: Record<string, string> })[] = [];
+        const quantities = new Map<string, number>();
+        let subtotalPaise = 0;
+        for (const item of items) {
+          const key = `${item.productId}:${item.variantId || ''}`;
+          const quantity = (quantities.get(key) || 0) + item.quantity;
+          if (quantity > 20) throw new AppError('Maximum quantity is 20 per product option.', 400);
+          quantities.set(key, quantity);
+          const product = await Product.findOne({ _id: item.productId, storeId, isActive: true }).session(session);
+          if (!product) throw new AppError('A product is no longer available.', 404);
+          if (product.hasVariants !== Boolean(item.variantId)) throw new AppError('Choose a valid product option.', 400);
+          const variant = item.variantId ? await ProductVariant.findOne({ _id: item.variantId, productId: item.productId, isActive: true }).session(session) : null;
+          if (item.variantId && !variant) throw new AppError('Product option is unavailable.', 400);
+          if ((variant?.stock ?? product.stock) < quantity) throw new AppError(`Insufficient inventory for ${product.name}`, 409);
+          const paise = Math.round((variant?.price ?? product.sellingPrice) * 100);
+          if (!Number.isSafeInteger(paise) || paise < 100) throw new AppError('Product price is unavailable. Contact support.', 400);
+          subtotalPaise += paise * item.quantity;
+          orderItems.push({
+            productId: String(product._id), variantId: item.variantId,
+            name: variant ? `${product.name} (${variant.name})` : product.name,
+            sku: variant?.sku || product.sku, quantity: item.quantity, price: paise / 100, total: paise * item.quantity / 100,
+            image: variant?.images?.[variant.featuredImageIndex || 0] || product.featuredImage,
+            selectedAttributes: variant ? Object.fromEntries(Object.entries(variant.attributes instanceof Map ? Object.fromEntries(variant.attributes) : variant.attributes)) : undefined,
+          });
+        }
+        const subtotal = subtotalPaise / 100;
+        const shipping = getShipping(subtotal, settings);
+        const initialStatus = paymentMethod === 'cod' ? 'confirmed' : 'pending';
+        const convertAddress = (address: typeof shippingAddress) => ({ ...address, address1: address.addressLine1, address2: address.addressLine2, postalCode: address.pincode, phone: customer.phone });
+        if (paymentMethod === 'cod') await changeInventory(orderItems, storeId, -1, session);
+        [order] = await Order.create([{
+          storeId, checkoutKey, checkoutFingerprint: fingerprint, orderNumber: generateOrderNumber(),
+          customer: { userId: req.user!.id, email: req.user!.email, name: `${customer.firstName} ${customer.lastName}`.trim(), phone: customer.phone },
+          items: orderItems, subtotal, shipping, total: (subtotalPaise + Math.round(shipping * 100)) / 100,
+          status: initialStatus, paymentStatus: 'pending', paymentMethod,
+          inventoryStatus: paymentMethod === 'cod' ? 'committed' : 'uncommitted',
+          shippingAddress: convertAddress(shippingAddress), billingAddress: convertAddress(billingAddress),
+          statusHistory: [{ status: initialStatus, at: new Date(), note: paymentMethod === 'cod' ? 'Order confirmed. Pay on delivery.' : 'Awaiting online payment.' }],
+        }], { session });
       });
-
-      if (!product) {
-        throw new AppError(`Product ${item.productId} not found`, 404);
+    } catch (error: any) {
+      if (error.code === 11000) {
+        const existing = await Order.findOne({ checkoutKey, 'customer.userId': req.user!.id }).select('+checkoutFingerprint');
+        if (existing?.checkoutFingerprint === fingerprint) return res.json({ success: true, data: existing });
       }
-
-      let price = product.sellingPrice;
-      let name = product.name;
-      let sku = product.sku || `PRODUCT-${String(product._id).slice(-8)}`;
-      let image = product.featuredImage;
-
-      // If variant is selected, use variant details
-      if (item.variantId) {
-        const variant = await ProductVariant.findOne({
-          _id: item.variantId,
-          productId: String(product._id),
-          isActive: true,
-        });
-        if (!variant) {
-          throw new AppError(`Variant ${item.variantId} not found`, 404);
-        }
-
-        if (variant.stock < quantity) {
-          throw new AppError(`Insufficient inventory for variant ${variant.name}`, 400);
-        }
-
-        price = variant.price;
-        name = `${product.name} (${variant.name})`;
-        sku = variant.sku;
-        if (variant.images && variant.images.length > 0) {
-          image = variant.images[variant.featuredImageIndex || 0] || variant.images[0];
-        }
-
-        if (shouldCommitInventoryAtOrderCreation(paymentMethod)) {
-          variant.stock -= quantity;
-          await variant.save();
-        }
-      } else {
-        // Simple product stock check
-        if (product.stock < quantity) {
-          throw new AppError(`Insufficient inventory for ${product.name}`, 400);
-        }
-
-        if (shouldCommitInventoryAtOrderCreation(paymentMethod)) {
-          product.stock -= quantity;
-          await product.save();
-        }
-      }
-
-      const itemTotal = price * quantity;
-      subtotal += itemTotal;
-
-      orderItems.push({
-        productId: String(product._id),
-        variantId: item.variantId ? String(item.variantId) : undefined,
-        name: name,
-        sku: sku,
-        quantity,
-        price: price,
-        total: itemTotal,
-        image: image,
-        selectedAttributes: item.selectedAttributes,
-      });
+      throw error;
+    } finally { await session.endSession(); }
+    if (order?.paymentMethod === 'cod') {
+      try { await mailService.sendOrderConfirmation(order.customer.email, order); }
+      catch { console.error('Order confirmation email failed', { orderId: String(order._id) }); }
     }
-
-    const shipping = subtotal > 2500 ? 0 : 750;
-    const total = subtotal + shipping;
-
-    const initialStatus = paymentMethod === 'cod' ? 'confirmed' : 'pending';
-    const order = await Order.create({
-      storeId,
-      orderNumber: generateOrderNumber(),
-      customer: {
-        userId: authReq.user?.id,
-        email: customer.email,
-        name: `${customer.firstName} ${customer.lastName}`,
-        phone: customer.phone,
-      },
-      items: orderItems,
-      subtotal,
-      shipping,
-      total,
-      status: initialStatus,
-      paymentStatus: paymentMethod === 'cod' ? 'pending' : 'pending',
-      paymentMethod,
-      shippingAddress: {
-        firstName: shippingAddress.firstName,
-        lastName: shippingAddress.lastName,
-        address1: shippingAddress.addressLine1,
-        address2: shippingAddress.addressLine2,
-        city: shippingAddress.city,
-        state: shippingAddress.state,
-        postalCode: shippingAddress.pincode,
-        country: shippingAddress.country,
-        phone: customer.phone,
-      },
-      billingAddress: {
-        firstName: billingAddress.firstName,
-        lastName: billingAddress.lastName,
-        address1: billingAddress.addressLine1,
-        address2: billingAddress.addressLine2,
-        city: billingAddress.city,
-        state: billingAddress.state,
-        postalCode: billingAddress.pincode,
-        country: billingAddress.country,
-        phone: customer.phone,
-      },
-      statusHistory: [{
-        status: initialStatus,
-        at: new Date(),
-        note: paymentMethod === 'cod' ? 'Order placed with Cash on Delivery.' : 'Order created and awaiting online payment.',
-      }],
-    });
-
-    if (paymentMethod === 'cod') {
-      try {
-        await mailService.sendOrderConfirmation(customer.email, order);
-      } catch (error) {
-        console.error('Error sending order confirmation email:', error);
-      }
-    }
-
     res.status(201).json({ success: true, data: order });
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 export const updateOrderStatus = async (
@@ -332,6 +235,10 @@ export const updateOrderStatus = async (
     }
 
     const previousStatus = order.status;
+    if (status !== previousStatus && !ORDER_TRANSITIONS[previousStatus].includes(status)) throw new AppError('This order status transition is not allowed. Use the payment refund action for refunds.', 409);
+    if (['confirmed', 'processing', 'shipped', 'delivered'].includes(status) && (order.inventoryStatus === 'review' || (order.paymentMethod !== 'cod' && order.paymentStatus !== 'paid'))) throw new AppError('Confirm payment and reconcile stock before fulfillment.', 409);
+    if (status === 'shipped' && !(fulfillmentInput?.carrier || order.fulfillment?.carrier || '')?.trim()) throw new AppError('Enter the shipping carrier before dispatch.', 400);
+    if (status === 'shipped' && !(fulfillmentInput?.trackingNumber || order.fulfillment?.trackingNumber || '')?.trim()) throw new AppError('Enter a tracking number before dispatch.', 400);
     const historyNote = cleanOptionalText(note, 500);
     const fulfillment = fulfillmentInput && typeof fulfillmentInput === 'object'
       ? {
@@ -346,6 +253,7 @@ export const updateOrderStatus = async (
       throw new AppError('Estimated delivery must be a valid date', 400);
     }
 
+    if (fulfillment?.trackingUrl && !/^https:\/\//i.test(fulfillment.trackingUrl)) throw new AppError('Tracking URL must use HTTPS.', 400);
     order.status = status;
     if (fulfillment) {
       const currentFulfillment = order.fulfillment || {};
@@ -370,7 +278,19 @@ export const updateOrderStatus = async (
       ];
     }
 
-    await order.save();
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const current = await Order.findOne({ _id: order._id, status: previousStatus, updatedAt: order.updatedAt }).session(session);
+        if (!current) throw new AppError('Order changed. Refresh before saving.', 409);
+        if (status === 'cancelled' && current.inventoryStatus === 'committed') {
+          await changeInventory(current.items, current.storeId, 1, session);
+          order.inventoryStatus = 'released';
+        }
+        if (status === 'delivered' && order.paymentMethod === 'cod') order.paymentStatus = 'paid';
+        await Order.updateOne({ _id: order._id }, { $set: { status: order.status, paymentStatus: order.paymentStatus, inventoryStatus: order.inventoryStatus, fulfillment: order.fulfillment, statusHistory: order.statusHistory } }, { session, runValidators: true });
+      });
+    } finally { await session.endSession(); }
 
     if (previousStatus !== status || historyNote) {
 	      try {

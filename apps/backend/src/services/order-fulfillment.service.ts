@@ -1,15 +1,8 @@
-import type { OrderItem } from '@repo/types';
+import mongoose from 'mongoose';
 import { AppError } from '../middleware/error-handler';
 import { Order } from '../models/order.model';
-import { Product } from '../models/product.model';
 import { Transaction } from '../models/transaction.model';
-import { ProductVariant } from '../models/variant.model';
-
-type AppliedInventoryChange = {
-  kind: 'product' | 'variant';
-  id: string;
-  quantity: number;
-};
+import { changeInventory } from './inventory.service';
 
 type FulfillmentResult = {
   order: InstanceType<typeof Order> | null;
@@ -17,218 +10,49 @@ type FulfillmentResult = {
   state: 'fulfilled' | 'already_fulfilled' | 'processing' | 'manual_review';
 };
 
-function appendOrderNote(existing: string | undefined, note: string) {
-  if (!existing) {
-    return note;
-  }
-
-  if (existing.includes(note)) {
-    return existing;
-  }
-
-  return `${existing}\n${note}`;
-}
-
-async function decrementInventory(items: OrderItem[]) {
-  const appliedChanges: AppliedInventoryChange[] = [];
-
-  try {
-    for (const item of items) {
-      if (item.variantId) {
-        const updatedVariant = await ProductVariant.findOneAndUpdate(
-          { _id: item.variantId, stock: { $gte: item.quantity } },
-          { $inc: { stock: -item.quantity } },
-          { new: true }
-        );
-
-        if (!updatedVariant) {
-          throw new AppError(`Insufficient inventory for ${item.name}`, 409);
-        }
-
-        appliedChanges.push({ kind: 'variant', id: item.variantId, quantity: item.quantity });
-        continue;
-      }
-
-      const updatedProduct = await Product.findOneAndUpdate(
-        { _id: item.productId, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { new: true }
-      );
-
-      if (!updatedProduct) {
-        throw new AppError(`Insufficient inventory for ${item.name}`, 409);
-      }
-
-      appliedChanges.push({ kind: 'product', id: item.productId, quantity: item.quantity });
-    }
-  } catch (error) {
-    for (const change of appliedChanges.reverse()) {
-      if (change.kind === 'variant') {
-        await ProductVariant.findByIdAndUpdate(change.id, {
-          $inc: { stock: change.quantity },
-        });
-        continue;
-      }
-
-      await Product.findByIdAndUpdate(change.id, {
-        $inc: { stock: change.quantity },
-      });
-    }
-
-    throw error;
-  }
-}
-
 export async function finalizeCapturedPayment(params: {
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
-  razorpaySignature?: string;
-  method?: string;
-  email?: string;
-  phone?: string;
-}) : Promise<FulfillmentResult> {
-  const transaction = await Transaction.findOne({
-    razorpayOrderId: params.razorpayOrderId,
-  });
-
-  if (!transaction) {
-    throw new AppError('Transaction not found', 404);
-  }
-
-  if (!['created', 'authorized', 'captured'].includes(transaction.status)) {
-    throw new AppError('Transaction cannot be fulfilled in its current state', 409);
-  }
-
-  if (transaction.status !== 'captured') {
-    transaction.status = 'captured';
-  }
-
-  transaction.razorpayPaymentId = params.razorpayPaymentId;
-
-  if (params.razorpaySignature) {
-    transaction.razorpaySignature = params.razorpaySignature;
-  }
-
-  if (params.method) {
-    transaction.method = params.method;
-  }
-
-  if (params.email) {
-    transaction.email = params.email;
-  }
-
-  if (params.phone) {
-    transaction.phone = params.phone;
-  }
-
-  await transaction.save();
-
-  let order = await Order.findById(transaction.orderId);
-
-  if (!order) {
-    throw new AppError('Order not found for transaction', 404);
-  }
-
-  if (order.paymentStatus === 'paid') {
-    return {
-      order,
-      transaction,
-      state: 'already_fulfilled',
-    };
-  }
-
-  const claimedOrder = await Order.findOneAndUpdate(
-    {
-      _id: order._id,
-      paymentStatus: 'pending',
-      $or: [
-        { transactionId: { $exists: false } },
-        { transactionId: null },
-        { transactionId: '' },
-      ],
-    },
-    {
-      $set: {
-        transactionId: String(transaction._id),
-        razorpayOrderId: params.razorpayOrderId,
-      },
-    },
-    { new: true }
-  );
-
-  if (!claimedOrder) {
-    order = await Order.findById(transaction.orderId);
-
-    if (order?.paymentStatus === 'paid') {
-      return {
-        order,
-        transaction,
-        state: 'already_fulfilled',
-      };
-    }
-
-    return {
-      order,
-      transaction,
-      state: 'processing',
-    };
-  }
-
+  razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature?: string;
+  method?: string; email?: string; phone?: string; amount?: number; currency?: string;
+}): Promise<FulfillmentResult> {
+  const session = await mongoose.startSession();
+  let result: FulfillmentResult | undefined;
   try {
-    await decrementInventory(claimedOrder.items);
-  } catch (error: any) {
-    const reviewNote = appendOrderNote(
-      claimedOrder.notes,
-      `Payment captured but inventory reconciliation is required: ${error.message || 'Unknown inventory error'}`
-    );
-
-    order = await Order.findByIdAndUpdate(
-      claimedOrder._id,
-      {
-        $set: {
-          paymentStatus: 'paid',
-          status: 'pending',
-          notes: reviewNote,
-        },
-        $push: {
-          statusHistory: {
-            status: 'pending',
-            at: new Date(),
-            note: 'Payment captured. Inventory reconciliation is required before fulfilment.',
-          },
-        },
-      },
-      { new: true }
-    );
-
-    return {
-      order,
-      transaction,
-      state: 'manual_review',
+    const apply = async (review: boolean) => {
+      const transaction = await Transaction.findOne({ razorpayOrderId: params.razorpayOrderId }).session(session);
+      if (!transaction) throw new AppError('Transaction not found', 404);
+      if (params.amount !== undefined && params.amount !== Math.round(transaction.amount * 100)) throw new AppError('Payment amount mismatch', 400);
+      if (params.currency && params.currency !== transaction.currency) throw new AppError('Payment currency mismatch', 400);
+      const order = await Order.findById(transaction.orderId).session(session);
+      if (!order) throw new AppError('Order not found', 404);
+      if (transaction.status === 'refunded' || order.paymentStatus === 'refunded') {
+        result = { order, transaction, state: 'already_fulfilled' }; return;
+      }
+      if (transaction.razorpayPaymentId && transaction.status === 'captured' && transaction.razorpayPaymentId !== params.razorpayPaymentId) throw new AppError('Unexpected second payment. Contact support.', 409);
+      transaction.status = 'captured';
+      transaction.razorpayPaymentId = params.razorpayPaymentId;
+      if (params.razorpaySignature) transaction.razorpaySignature = params.razorpaySignature;
+      if (params.method) transaction.method = params.method;
+      if (params.email) transaction.email = params.email;
+      if (params.phone) transaction.phone = params.phone;
+      await transaction.save({ session });
+      if (order.paymentStatus === 'paid') { result = { order, transaction, state: 'already_fulfilled' }; return; }
+      const needsReview = review || order.status === 'cancelled';
+      if (!needsReview && order.inventoryStatus !== 'committed') await changeInventory(order.items, order.storeId, -1, session);
+      order.paymentStatus = 'paid';
+      order.transactionId = String(transaction._id);
+      order.razorpayOrderId = params.razorpayOrderId;
+      order.inventoryStatus = needsReview ? 'review' : 'committed';
+      order.status = needsReview ? order.status : 'confirmed';
+      order.statusHistory = [...(order.statusHistory || []), { status: order.status, at: new Date(), note: needsReview ? 'Payment received. Our team is reviewing this order and will contact you.' : 'Payment received and order confirmed.' }];
+      if (needsReview) order.notes = 'Paid order requires stock reconciliation or refund before fulfillment.';
+      await order.save({ session });
+      result = { order, transaction, state: needsReview ? 'manual_review' : 'fulfilled' };
     };
-  }
-
-  order = await Order.findByIdAndUpdate(
-    claimedOrder._id,
-      {
-        $set: {
-          paymentStatus: 'paid',
-          status: 'confirmed',
-        },
-        $push: {
-          statusHistory: {
-            status: 'confirmed',
-            at: new Date(),
-            note: 'Payment captured and order confirmed.',
-          },
-        },
-      },
-    { new: true }
-  );
-
-  return {
-    order,
-    transaction,
-    state: 'fulfilled',
-  };
+    try { await session.withTransaction(() => apply(false)); }
+    catch (error) {
+      if (!(error instanceof AppError) || error.statusCode !== 409 || !error.message.startsWith('Insufficient inventory')) throw error;
+      await session.withTransaction(() => apply(true));
+    }
+    return result!;
+  } finally { await session.endSession(); }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store-context';
 import Link from 'next/link';
+import { TopBar } from './TopBar';
 import { NavDropdown } from './NavDropdown';
 import { Search, ShoppingBag, Heart, Menu, X, UserRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -63,7 +64,7 @@ export function Navbar() {
       api.get<SearchSuggestion[]>(
         `/stores/${store._id}/products/search/suggestions?search=${encodeURIComponent(query)}&limit=6`
       )
-        .then((data) => setSuggestions(Array.isArray(data) ? data : []))
+        .then((data) => { if (!controller.signal.aborted) setSuggestions(Array.isArray(data) ? data : []); })
         .catch(() => {
           if (!controller.signal.aborted) setSuggestions([]);
         })
@@ -177,7 +178,8 @@ export function Navbar() {
 
   return (
     <>
-      <header className="fixed top-0 w-full z-50 bg-white dark:bg-black border-b border-gray-100 dark:border-white/10 transition-colors duration-300">
+      <header className="sticky top-0 w-full z-50 bg-white dark:bg-black border-b border-gray-100 dark:border-white/10 transition-colors duration-300">
+        <TopBar />
         <div className="container mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <Link href={`/${store.slug}`} className="z-50 flex max-w-[96px] items-center gap-2 md:max-w-none">

@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { getShipping } from '@repo/types';
 import type { Product, ProductVariant, CartItem } from '@repo/types';
 
 interface CartStore {
@@ -26,6 +27,8 @@ export const useCart = create<CartStore>()(
             items: [],
 
             addItem: (product, variant, quantity = 1) => {
+                if (!Number.isInteger(quantity) || quantity < 1 || (variant?.stock ?? product.stock) < 1) return;
+                quantity = Math.min(quantity, 20, variant?.stock ?? product.stock);
                 set((state) => {
                     const existingItemIndex = state.items.findIndex(
                         (item) =>
@@ -37,7 +40,7 @@ export const useCart = create<CartStore>()(
                     if (existingItemIndex > -1) {
                         // Update quantity of existing item
                         const newItems = [...state.items];
-                        newItems[existingItemIndex].quantity += quantity;
+                        newItems[existingItemIndex] = { ...newItems[existingItemIndex], quantity: Math.min(20, variant?.stock ?? product.stock, newItems[existingItemIndex].quantity + quantity), product, variant };
                         return { items: newItems };
                     } else {
                         // Add new item
@@ -86,7 +89,7 @@ export const useCart = create<CartStore>()(
                 set((state) => ({
                     items: state.items.map((item) =>
                         item.storeId === storeId && item.productId === productId && item.variantId === variantId
-                            ? { ...item, quantity }
+                            ? { ...item, quantity: Math.min(20, Math.max(1, item.variant?.stock ?? item.product?.stock ?? 20), Math.floor(quantity)) }
                             : item
                     ),
                 }));
@@ -111,7 +114,7 @@ export const useCart = create<CartStore>()(
 
             getTotal: (storeId) => {
                 const subtotal = get().getSubtotal(storeId);
-                const delivery = subtotal > 0 && subtotal <= 2500 ? 750 : 0;
+                const delivery = subtotal > 0 ? getShipping(subtotal) : 0;
                 return subtotal + delivery;
             },
         }),

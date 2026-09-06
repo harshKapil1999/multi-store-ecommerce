@@ -48,3 +48,7 @@ next-env.d.ts
 # Local documentation (keep the production runbook versioned)
 docs/*
 !docs/DEPLOYMENT.md
+
+# Local release backups (may contain customer data)
+.local-backups/
+!docs/PRODUCTION-READINESS.md

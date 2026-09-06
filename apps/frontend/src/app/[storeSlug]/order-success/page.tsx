@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store-context';
 import { Button } from '@/components/ui/Button';
@@ -10,7 +10,8 @@ import { api } from '@/lib/api';
 
 const TERMINAL_ORDER_STATUSES = ['delivered', 'cancelled', 'refunded'];
 
-export default function OrderSuccessPage({ params }: { params: { storeSlug: string } }) {
+export default function OrderSuccessPage({ params }: { params: Promise<{ storeSlug: string }> }) {
+  const { storeSlug } = use(params);
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const email = searchParams.get('email');
@@ -26,8 +27,8 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
         return;
       }
       try {
-        const query = email ? `?email=${encodeURIComponent(email)}` : '';
-        const orderData = await api.get<any>(`/orders/track/${orderId}${query}`);
+        const orderData = await api.get<any>(`/orders/${orderId}`);
+        if (store && orderData.storeId !== store._id) throw new Error('Order belongs to another store');
         setOrder(orderData);
       } catch (error) {
         console.error('Error fetching order:', error);
@@ -60,11 +61,11 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
         <CheckCircle2 size={64} className="text-green-500 mb-6" />
-        <h1 className="text-3xl font-bold mb-2 text-center">Thank you for your order!</h1>
+        <h1 className="text-3xl font-bold mb-2 text-center">Unable to load this order</h1>
         <p className="text-gray-500 mb-8 text-center max-w-md">
-          Your order has been received and is being processed. You will receive an email confirmation soon.
+          Sign in with the email used at checkout to view your orders. If a payment was debited, contact support before trying again.
         </p>
-        <Link href={`/${params.storeSlug}`}>
+        <Link href={`/${storeSlug}`}>
           <Button className="rounded-full px-8">Continue Shopping</Button>
         </Link>
       </div>
@@ -84,10 +85,10 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
               <CheckCircle2 size={40} className="text-green-600 dark:text-green-400" />
             </div>
             <h1 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase mb-2">
-              {isPaid ? 'Order Confirmed' : 'Payment Processing'}
+              {order.status === 'cancelled' ? 'Order cancelled' : order.status === 'refunded' ? 'Payment refunded' : order.inventoryStatus === 'review' ? 'Order under review' : order.paymentStatus === 'failed' ? 'Payment unsuccessful' : isPaid || order.paymentMethod === 'cod' ? 'Order confirmed' : 'Confirming payment'}
             </h1>
             <p className="text-gray-500 dark:text-gray-400">Order #{order.orderNumber}</p>
-            {!isPaid && (
+            {!isPaid && order.paymentMethod !== 'cod' && order.paymentStatus === 'pending' && (
               <p className="mt-3 max-w-md text-center text-sm text-gray-500 dark:text-gray-400">
                 Razorpay is confirming the payment. This page checks your order automatically, so you can keep it open.
               </p>
@@ -201,13 +202,13 @@ export default function OrderSuccessPage({ params }: { params: { storeSlug: stri
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Link href={`/${params.storeSlug}`}>
+            <Link href={`/${storeSlug}`}>
               <Button variant="outline" className="w-full rounded-full py-6 flex items-center justify-center gap-2">
                 <ShoppingBag size={18} />
                 Continue Shopping
               </Button>
             </Link>
-            <Link href={`/${params.storeSlug}/account/orders`}>
+            <Link href={`/${storeSlug}/account/orders`}>
               <Button className="w-full rounded-full py-6 bg-black text-white hover:bg-zinc-800 flex items-center justify-center gap-2">
                 Track Order
                 <ArrowRight size={18} />

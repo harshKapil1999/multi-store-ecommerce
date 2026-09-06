@@ -60,6 +60,8 @@ export function MobileSidebar({ isOpen, onClose, categories, onSignIn }: MobileS
 
       {/* Sidebar */}
       <div 
+        inert={!isOpen}
+        aria-hidden={!isOpen}
         className={cn(
           "fixed inset-y-0 right-0 w-full sm:w-[350px] bg-white dark:bg-black z-[70] transform transition-transform duration-300 ease-in-out lg:hidden flex flex-col",
           isOpen ? "translate-x-0" : "translate-x-full"
@@ -117,6 +119,8 @@ export function MobileSidebar({ isOpen, onClose, categories, onSignIn }: MobileS
 
                 {/* Nested Categories (Accordion) */}
                 <div 
+                  inert={!expandedCategories.includes(category._id)}
+                  aria-hidden={!expandedCategories.includes(category._id)}
                   className={cn(
                     "pl-4 space-y-1 overflow-hidden transition-all duration-300 ease-in-out",
                     expandedCategories.includes(category._id) 

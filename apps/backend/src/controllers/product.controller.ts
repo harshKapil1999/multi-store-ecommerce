@@ -1,3 +1,4 @@
+import { canReadDrafts } from '../middleware/store-context';
 import { Response, NextFunction } from 'express';
 import { Product } from '../models/product.model';
 import { Category } from '../models/category.model';
@@ -26,14 +27,17 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       sortOrder = 'desc',
     } = req.query;
 
-    const query: Record<string, any> = { storeId };
+    const query: Record<string, any> = { storeId, ...(!canReadDrafts(req) ? { isActive: true } : {}) };
 
     // specialized category handling for recursive lookup
     if (category) {
       // Fetch all categories to build the tree and find descendants
       const allCategories = await Category.find({ storeId }).select('_id parentId').lean();
 
+      const visited = new Set<string>();
       const getDescendants = (parentId: string): string[] => {
+        if (visited.has(parentId)) return [];
+        visited.add(parentId);
         const children = allCategories.filter(c => String(c.parentId) === parentId);
         let descendants: string[] = children.map(c => String(c._id));
 
@@ -47,8 +51,8 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       query.categoryId = { $in: categoryIds };
     }
 
-    if (isFeatured === 'true') query.isFeatured = true;
-    if (String(includeInactive) !== 'true') query.isActive = true;
+    if (String(isFeatured) === 'true') query.isFeatured = true;
+    if (String(includeInactive) !== 'true' || !canReadDrafts(req)) query.isActive = true;
 
     if (minPrice || maxPrice) {
       query.sellingPrice = {};
@@ -78,7 +82,7 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
     const [products, total] = await Promise.all([
       Product.find(query)
         .sort({ [sortBy as string]: sortOrder === 'asc' ? 1 : -1 })
-        .limit(Number(limit))
+        .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 10))))
         .skip((Number(page) - 1) * Number(limit)),
       Product.countDocuments(query),
     ]);
@@ -132,7 +136,7 @@ export const getProductById = async (req: AuthRequest, res: Response, next: Next
   try {
     const { id, storeId } = req.params;
 
-    const product = await Product.findOne({ _id: id, storeId });
+    const product = await Product.findOne({ _id: id, storeId, ...(!canReadDrafts(req) ? { isActive: true } : {}) });
     if (!product) {
       throw new AppError('Product not found', 404);
     }
@@ -172,7 +176,7 @@ export const getFeaturedProducts = async (
       isFeatured: true,
       isActive: true,
     })
-      .limit(Number(limit))
+      .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 10))))
       .sort({ createdAt: -1 });
 
     res.json({ success: true, data: products });
@@ -191,6 +195,7 @@ export const createProduct = async (req: AuthRequest, res: Response, next: NextF
       throw new AppError('Category does not belong to this store', 400);
     }
 
+    if (input.sellingPrice > input.mrp) throw new AppError('Selling price must not exceed MRP.', 400);
     // Check slug uniqueness within store
     const existing = await Product.findOne({ storeId, slug: input.slug });
     if (existing) {
@@ -229,6 +234,8 @@ export const updateProduct = async (req: AuthRequest, res: Response, next: NextF
       }
     }
 
+    if (input.categoryId && !(await Category.exists({_id: input.categoryId, storeId}))) throw new AppError('Category does not belong to this store', 400);
+    if ((input.sellingPrice ?? product.sellingPrice) > (input.mrp ?? product.mrp)) throw new AppError('Selling price must not exceed MRP.', 400);
     Object.assign(product, input);
     await product.save();
 

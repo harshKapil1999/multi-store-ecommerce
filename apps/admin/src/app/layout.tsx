@@ -6,6 +6,7 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  robots: { index: false, follow: false },
   title: 'Admin Dashboard',
   description: 'Multi-store ecommerce admin panel',
 };

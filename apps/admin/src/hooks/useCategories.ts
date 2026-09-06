@@ -19,8 +19,11 @@ export const useCategories = (storeId: string, featured?: boolean) => {
       const endpoint = featured
         ? `/stores/${storeId}/categories/featured`
         : `/stores/${storeId}/categories`;
-      const { data } = await apiClient.get(endpoint);
-      return data.data;
+      if (featured) return (await apiClient.get(endpoint)).data.data;
+      const first = (await apiClient.get(`${endpoint}?limit=100&page=1`)).data.data;
+      const all = [...first.data];
+      for (let page = 2; page <= first.totalPages; page++) all.push(...(await apiClient.get(`${endpoint}?limit=100&page=${page}`)).data.data.data);
+      return {...first, data: all};
     },
     enabled: !!storeId,
   });

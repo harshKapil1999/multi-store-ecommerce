@@ -23,19 +23,24 @@ export const useStore = () => useContext(StoreContext);
 interface StoreProviderProps {
   children: React.ReactNode;
   slug: string;
+  initialStore?: Store;
+  initialCategories?: CategoryWithChildren[];
 }
 
-export const StoreProvider: React.FC<StoreProviderProps> = ({ children, slug }) => {
-  const [store, setStore] = useState<Store | null>(null);
-  const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export const StoreProvider: React.FC<StoreProviderProps> = ({ children, slug, initialStore, initialCategories }) => {
+  const [store, setStore] = useState<Store | null>(initialStore || null);
+  const [categories, setCategories] = useState<CategoryWithChildren[]>(initialCategories || []);
+  const [isLoading, setIsLoading] = useState(!initialStore);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialStore?.slug === slug) { setStore(initialStore); setCategories(initialCategories || []); setError(null); setIsLoading(false); return; }
+    let current = true;
     const fetchStoreData = async () => {
       try {
         setIsLoading(true);
         const storeData = await api.get<Store>(`/stores/slug/${slug}`);
+        if (!current) return;
         setStore(storeData);
 
         if (storeData._id) {
@@ -54,7 +59,8 @@ export const StoreProvider: React.FC<StoreProviderProps> = ({ children, slug }) 
     if (slug) {
       fetchStoreData();
     }
-  }, [slug]);
+    return () => { current = false; };
+  }, [slug, initialStore, initialCategories]);
 
   return (
     <StoreContext.Provider value={{ store, categories, isLoading, error }}>

@@ -38,11 +38,12 @@ export class R2Service {
   /**
    * Generate presigned URL for direct upload from client
    */
-  async generatePresignedUrl(key: string, contentType: string, expiresIn: number = 3600) {
+  async generatePresignedUrl(key: string, contentType: string, expiresIn: number = 900, contentLength?: number) {
     const command = new PutObjectCommand({
       Bucket: this.bucketName,
       Key: key,
       ContentType: contentType,
+      ...(contentLength !== undefined ? {ContentLength: contentLength} : {}),
     });
 
     try {

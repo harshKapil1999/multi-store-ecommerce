@@ -5,6 +5,9 @@ export interface ITransaction extends Omit<TransactionType, '_id'>, Document { }
 
 const transactionSchema = new Schema<ITransaction>(
     {
+        refundError: String,
+        refundPending: { type: Boolean, default: false },
+        refundId: String,
         orderId: {
             type: String,
             required: true,

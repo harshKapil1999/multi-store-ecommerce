@@ -1,3 +1,4 @@
+import type { AuthRequest } from '../middleware/auth';
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../middleware/error-handler';
 import { NewsletterSubscriber } from '../models/newsletter-subscriber.model';
@@ -35,4 +36,9 @@ export const listSubscribers = async (req: Request, res: Response, next: NextFun
   } catch (error) {
     next(error);
   }
+};
+
+export const unsubscribe = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try { await NewsletterSubscriber.updateOne({ storeId: req.params.storeId, email: req.user!.email }, { $set: { status: 'unsubscribed' } }); res.json({ success: true, message: 'You are unsubscribed.' }); }
+  catch (error) { next(error); }
 };

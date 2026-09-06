@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth';
 const router: Router = Router();
 
 // All routes protected (authenticated users)
-router.use(authenticate);
+router.use(authenticate, authorize('admin', 'store_owner'));
 
 // Public upload endpoints
 router.post('/presigned-url', uploadController.getPresignedUrl);

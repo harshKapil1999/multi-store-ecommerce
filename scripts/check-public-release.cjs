@@ -1,0 +1,4 @@
+const assert=require('node:assert/strict');
+(async()=>{const origin='https://shop.crabtile.com';const sitemap=await (await fetch(`${origin}/sitemap.xml`)).text();const urls=[...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map(m=>m[1].replace(/&amp;/g,'&'));assert(!urls.some(u=>/puma|adidas/.test(u)));let failed=0;
+for(let i=0;i<urls.length;i+=4)for(const result of await Promise.all(urls.slice(i,i+4).map(async url=>{try{const res=await fetch(url);const html=await res.text();return{path:new URL(url).pathname,status:res.status,title:(html.match(/<title>(.*?)<\/title>/s)||[])[1],canonical:/rel="canonical"/.test(html),h1:(html.match(/<h1(?:\s|>)/g)||[]).length};}catch{return{path:url,error:'Request failed'};}}))){if(result.status!==200||!result.canonical||result.h1!==1)failed++;console.log(JSON.stringify(result));}
+console.log(JSON.stringify({pages:urls.length,failed}));process.exitCode=failed?1:0;})().catch(()=>{process.exitCode=1});

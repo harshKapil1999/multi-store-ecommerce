@@ -23,9 +23,10 @@ export function ProductInfo({
 }: ProductInfoProps) {
   const { toggleItem, hasItem } = useWishlist();
   const isFavourite = hasItem(product.storeId, product._id);
-  const productInformation = product.attributes?.filter(
-    (attribute) => attribute.name.toLowerCase() !== 'size'
-  ) || [];
+  const displayPrice = selectedVariant?.price ?? product.sellingPrice;
+  const originalPrice = selectedVariant ? (selectedVariant.compareAtPrice || 0) : product.mrp;
+  const discountPercent = originalPrice > displayPrice ? Math.round((originalPrice - displayPrice) / originalPrice * 100) : 0;
+  const productInformation = product.attributes?.filter((attribute) => attribute.name && attribute.value) || [];
 
   return (
     <div className="space-y-6">
@@ -39,7 +40,7 @@ export function ProductInfo({
          )}
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-xl font-semibold">
-              ₹{(selectedVariant?.price || product.sellingPrice).toLocaleString()}
+              ₹{(selectedVariant?.price ?? product.sellingPrice).toLocaleString()}
             </span>
             {/* If variant selected, show its compareAtPrice, otherwise show product mrp if it's a sale */}
             {selectedVariant ? (
@@ -52,16 +53,11 @@ export function ProductInfo({
                )
             )}
 
-            {/* Calculate discount % */}
-            {((selectedVariant?.compareAtPrice && selectedVariant.compareAtPrice > selectedVariant.price) || (product.mrp > product.sellingPrice && !selectedVariant)) && (
-               <span className="text-green-600 dark:text-green-400 font-medium text-sm bg-green-50 dark:bg-green-900/30 px-2 py-0.5 rounded">
-                  {Math.round((( (selectedVariant?.compareAtPrice || product.mrp) - (selectedVariant?.price || product.sellingPrice)) / (selectedVariant?.compareAtPrice || product.mrp)) * 100)}% off
-               </span>
-            )}
+            {discountPercent > 0 && <span className="text-green-600 dark:text-green-400 text-sm">{discountPercent}% off</span>}
           </div>
-          {(selectedVariant?.compareAtPrice || product.mrp) > 0 && (
+          {originalPrice > 0 && (
             <p className="text-xs text-gray-400 mt-1">
-              MRP: ₹{(selectedVariant?.compareAtPrice || product.mrp).toLocaleString()} (inclusive of taxes)
+              MRP: ₹{originalPrice.toLocaleString()} (inclusive of taxes)
             </p>
           )}
       </div>
@@ -73,27 +69,6 @@ export function ProductInfo({
           variants={variants}
           onVariantSelect={onVariantSelect}
         />
-      )}
-
-      {/* Basic Attribute Selector (Legacy fallback if no dynamic variants) */}
-      {!product.hasVariants && product.attributes?.some(a => a.name.toLowerCase() === 'size') && (
-        <div>
-           <div className="flex justify-between items-center mb-4">
-              <span className="font-medium text-gray-900 dark:text-white">Select Size</span>
-           </div>
-           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {product.attributes
-                .filter(a => a.name.toLowerCase() === 'size')
-                .map((attr, idx) => (
-                 <button
-                    key={idx}
-                    className="py-3 px-4 rounded-md border border-black bg-black text-white dark:border-white dark:bg-white dark:text-black text-sm font-medium"
-                 >
-                    {attr.value}
-                 </button>
-              ))}
-           </div>
-        </div>
       )}
 
       {/* Actions */}

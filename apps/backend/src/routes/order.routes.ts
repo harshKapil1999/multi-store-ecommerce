@@ -5,8 +5,8 @@ import { authenticate, authorize, optionalAuthenticate } from '../middleware/aut
 const router: Router = Router();
 
 // Public routes
-router.post('/', optionalAuthenticate, orderController.createOrder); // Guest checkout supported
-router.get('/track/:id', orderController.trackOrder);
+router.post('/', authenticate, orderController.createOrder); // Guest checkout supported
+router.get('/track/:id', authenticate, orderController.trackOrder);
 
 // Protected routes
 router.use(authenticate);

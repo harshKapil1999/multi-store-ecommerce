@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useSelectedStore } from '@/contexts/store-context';
 import { useTransactions } from '@/hooks/useTransactions';
 import { DataTable, Card } from '@/components/index';
@@ -11,9 +12,10 @@ import { Button } from '@/components/ui/button';
 
 export default function TransactionsPage() {
   const { selectedStoreId } = useSelectedStore();
-  const { data, isLoading } = useTransactions(selectedStoreId || undefined);
+  const [pagination, setPagination] = useState({pageIndex:0,pageSize:20});
+  const { data, isLoading, error } = useTransactions(selectedStoreId || undefined, pagination.pageIndex + 1, pagination.pageSize);
 
-  const transactions = (data || []) as Transaction[];
+  const transactions = (data?.data || []) as Transaction[];
 
   const columns: ColumnDef<Transaction>[] = [
     {
@@ -79,6 +81,7 @@ export default function TransactionsPage() {
     },
   ];
 
+  if (error) return <p role="alert">Unable to load transactions. Please refresh.</p>;
   if (!selectedStoreId) {
     return (
       <Card className="p-12 text-center">
@@ -97,7 +100,7 @@ export default function TransactionsPage() {
         <div className="flex items-center gap-2">
           <CreditCard className="h-5 w-5 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            {transactions.length} transaction(s)
+            {data?.total || 0} transaction(s)
           </span>
         </div>
       </div>
@@ -109,7 +112,7 @@ export default function TransactionsPage() {
               <DollarSign className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Captured</p>
+              <p className="text-sm text-muted-foreground">Captured on this page</p>
               <p className="text-2xl font-bold">
                 ₹{transactions
                   .filter(t => t.status === 'captured')
@@ -122,6 +125,10 @@ export default function TransactionsPage() {
 
       <Card className="p-6">
         <DataTable<Transaction>
+          pageIndex={pagination.pageIndex}
+          pageSize={pagination.pageSize}
+          pageCount={data?.totalPages || 1}
+          onPaginationChange={setPagination}
           columns={columns}
           data={transactions}
           isLoading={isLoading}

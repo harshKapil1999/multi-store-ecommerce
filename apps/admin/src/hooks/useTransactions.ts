@@ -7,19 +7,13 @@ export const TRANSACTIONS_QUERY_KEY = ['transactions'];
 /**
  * List all transactions with optional filters
  */
-export const useTransactions = (storeId?: string) => {
+export const useTransactions = (storeId?: string, page = 1, limit = 20) => {
     return useQuery({
-        queryKey: [...TRANSACTIONS_QUERY_KEY, storeId],
+        queryKey: [...TRANSACTIONS_QUERY_KEY, storeId, page, limit],
         queryFn: async () => {
             const endpoint = storeId ? `/transactions/store/${storeId}` : `/transactions`;
-            const { data } = await apiClient.get(endpoint);
-            // API returns { success: true, data: { data: [], total: ... } }
-            // We want to return the array of transactions, or the full object if we handle pagination later
-            // For now, let's match what the view expects (an array) by returning data.data.data
-            // However, the component expects 'data' to be the array.
-            // Let's modify the component to handle the pagination object, OR return just the array here.
-            // Given the existing code in page.tsx treats 'data' as Transaction[], we return just the array.
-            return data.data.data;
+            const { data } = await apiClient.get(`${endpoint}?page=${page}&limit=${limit}`);
+            return data.data;
         },
         enabled: !!storeId,
     });
@@ -50,6 +44,6 @@ export const useRefundTransaction = () => {
             toast.success('Refund initiated successfully');
             queryClient.invalidateQueries({ queryKey: TRANSACTIONS_QUERY_KEY });
         },
-        onError: (error: any) => toast.error(error.response?.data?.message || 'Refund failed'),
+        onError: (error: any) => { queryClient.invalidateQueries({queryKey:TRANSACTIONS_QUERY_KEY}); toast.error(error.response?.data?.message || 'Refund failed. Check payment status before retrying.'); },
     });
 };

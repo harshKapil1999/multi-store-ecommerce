@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { Product, ProductVariant } from '@repo/types';
 import { useCart } from '@/lib/cart-store';
@@ -29,16 +30,10 @@ export function AddToBagButton({
       return;
     }
 
-    setIsAdding(true);
-    
-    // Simulate a small delay for better UX
-    setTimeout(() => {
-      addItem(product, selectedVariant || undefined);
-      setIsAdding(false);
-      
-      // Optionally show a toast or open the cart sidebar
-      // The Navbar already listens to cart changes if we want to open it automatically
-    }, 500);
+    const existing = useCart.getState().items.find(item => item.productId === product._id && item.variantId === selectedVariant?._id);
+    if (existing && existing.quantity >= Math.min(20, selectedVariant?.stock ?? product.stock)) { toast.error('You have reached the available quantity.'); return; }
+    addItem(product, selectedVariant || undefined);
+    toast.success(`${product.name} added to your bag`);
   };
 
   const isOutOfStock = product.hasVariants 

@@ -9,7 +9,7 @@ export default function AccountOverviewPage() {
   const { storeSlug } = useParams<{ storeSlug: string }>();
   const { user } = useAuth();
   const cards = [
-    { href: `/${storeSlug}/account/orders`, title: 'Orders & tracking', text: 'See payment, fulfilment, delivery updates, and invoices.', icon: Package },
+    { href: `/${storeSlug}/account/orders`, title: 'Orders & tracking', text: 'See payment, fulfilment, delivery updates, and receipts.', icon: Package },
     { href: `/${storeSlug}/account/addresses`, title: 'Saved addresses', text: 'Keep delivery details ready for future checkouts.', icon: MapPin },
     { href: `/${storeSlug}/account/profile`, title: 'Personal details', text: 'Review your name and verified email address.', icon: UserRound },
   ];
@@ -28,7 +28,7 @@ export default function AccountOverviewPage() {
         ))}
       </div>
       <div className="mt-6 flex items-center gap-3 border border-gray-200 p-5 text-sm dark:border-white/10">
-        <ReceiptText className="h-5 w-5" /> Invoices are available from each paid order.
+        <ReceiptText className="h-5 w-5" /> You can print or save a receipt from your order details.
       </div>
     </div>
   );

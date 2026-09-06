@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation';
 import { api } from '@/lib/api';
 import { HeroCarousel } from '@/components/home/HeroCarousel';
 import { FeaturedCategories } from '@/components/home/FeaturedCategories';
@@ -29,6 +30,10 @@ async function getStoreData(slug: string) {
     // Extract products array from pagination response
     const products = Array.isArray(productsResponse?.data) ? productsResponse.data : [];
 
+    const known = new Set(products.map((product) => product._id));
+    const extraIds = [...new Set(store.homeSections?.flatMap((section) => section.productIds || []) || [])].filter((id) => !known.has(id));
+    const extras = await Promise.all(extraIds.map((id) => api.get<Product>(`/stores/${store._id}/products/${id}`).catch(() => null)));
+    products.push(...extras.filter((product): product is Product => Boolean(product)));
     return {
       store,
       billboards: store.homeBillboards || [],
@@ -57,50 +62,27 @@ function selectConfiguredItems<T extends { _id: string }>(items: T[], ids: strin
 }
 
 function getHomeSections(homeSections?: HomeSectionConfig[]): HomeSectionConfig[] {
-  const savedSections = homeSections || [];
-  const savedById = new Map(savedSections.map((section) => [section.id, section]));
-  const defaultIds = new Set(DEFAULT_HOME_SECTIONS.map((section) => section.id));
-
-  const completeDefaults = DEFAULT_HOME_SECTIONS.map((section) => ({
-    ...section,
-    ...savedById.get(section.id),
-  }));
-
-  return [
-    ...completeDefaults,
-    ...savedSections.filter((section) => !defaultIds.has(section.id)),
-  ];
+  return homeSections === undefined ? DEFAULT_HOME_SECTIONS : homeSections;
 }
 
 export default async function StorePage({ params }: PageProps) {
   const { storeSlug } = await params;
   const data = await getStoreData(storeSlug);
 
-  if (!data) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Store Not Found</h1>
-          <p className="text-gray-500">The store you are looking for does not exist.</p>
-        </div>
-      </div>
-    );
-  }
+  if (!data) notFound();
 
   const { store, billboards, products, categories } = data;
-  const allCategories = flattenCategories(categories);
+  const allCategories = flattenCategories(categories).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   const categoryTiles = allCategories.slice(0, 6);
   const spotlightProducts = products.slice(0, 8);
   const configuredSections = getHomeSections(store.homeSections)
     .filter((section) => section.isVisible)
     .sort((a, b) => a.order - b.order);
-  const catalogSections = configuredSections.filter((section) => section.type !== 'spotlight' && section.type !== 'newsletter');
-  const spotlightSections = configuredSections.filter((section) => section.type === 'spotlight');
-  const newsletterSections = configuredSections.filter((section) => section.type === 'newsletter');
-  const orderedSections = [...catalogSections, ...spotlightSections, ...newsletterSections];
+  const orderedSections = configuredSections;
 
   return (
     <>
+      {billboards.length > 0 && <h1 className="sr-only">{store.name}</h1>}
       {billboards.length > 0 ? (
         <HeroCarousel billboards={billboards} storeSlug={storeSlug} />
       ) : (
@@ -109,7 +91,7 @@ export default async function StorePage({ params }: PageProps) {
             <div>
               <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-700 dark:bg-white/10 dark:text-gray-200">
                 <Sparkles className="h-4 w-4" />
-                New season storefront
+                Explore the collection
               </div>
               <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-tight text-gray-950 dark:text-white md:text-7xl">
                 {store.name}
@@ -121,7 +103,7 @@ export default async function StorePage({ params }: PageProps) {
               )}
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
-                  href={`/${storeSlug}${categoryTiles[0] ? `/category/${categoryTiles[0].slug}` : ''}`}
+                  href={`/${storeSlug}/products`}
                   className="inline-flex items-center gap-2 rounded-full bg-black px-7 py-4 font-bold text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
                 >
                   Shop Now
@@ -163,7 +145,7 @@ export default async function StorePage({ params }: PageProps) {
           if (section.type === 'featured_categories') {
             const featured = allCategories.filter((category) => category.isFeatured);
             const selected = selectConfiguredItems(allCategories, section.categoryIds, featured.length ? featured : allCategories, limit);
-            return <FeaturedCategories key={section.id} categories={selected} storeSlug={storeSlug} title={section.title} subtitle={section.subtitle} />;
+            return <FeaturedCategories key={section.id} categories={selected} storeSlug={storeSlug} title={section.title} subtitle={section.subtitle} layout={section.layout} />;
           }
 
           if (section.type === 'category_collection') {

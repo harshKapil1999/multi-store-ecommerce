@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { Response, NextFunction } from 'express';
 import { getR2Service } from '../services/r2.service';
 import { AppError } from '../middleware/error-handler';
@@ -22,29 +23,30 @@ export const getPresignedUrl = async (
     const { filename, contentType, size } = req.body as PresignedUrlRequest;
 
     // Validation
-    if (!filename || !contentType) {
+    if (typeof filename !== 'string' || !filename || typeof contentType !== 'string') {
       throw new AppError('filename and contentType are required', 400);
     }
 
-    // Allow all content types - no restriction
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif', 'video/mp4', 'video/webm'].includes(contentType)) {
+      throw new AppError('Upload a supported image or video file.', 400);
+    }
 
     // Max file size: 50MB
     const maxSize = 50 * 1024 * 1024;
-    if (size > maxSize) {
+    if (!Number.isSafeInteger(size) || size <= 0 || size > maxSize) {
       throw new AppError('File size exceeds 50MB limit', 400);
     }
 
     // Generate unique key with timestamp and user ID
-    const timestamp = Date.now();
-    const ext = filename.split('.').pop();
-    const key = `uploads/${req.user!.id}/${timestamp}-${filename}`;
+    const safeName = String(filename).replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
+    const key = `uploads/${req.user!.id}/${randomUUID()}-${safeName}`;
 
     // Generate presigned URL
     const r2Service = getR2Service();
     const { uploadUrl, mediaUrl } = await r2Service.generatePresignedUrl(
       key,
       contentType,
-      3600 // 1 hour expiry
+      900, size // Sign the exact byte count; expire after 15 minutes
     );
 
     res.json({
@@ -53,7 +55,7 @@ export const getPresignedUrl = async (
         uploadUrl,
         mediaUrl,
         key,
-        expiresIn: 3600,
+        expiresIn: 900,
       },
     });
   } catch (error) {
@@ -78,7 +80,7 @@ export const confirmUpload = async (
     }
 
     // Verify key belongs to current user (security check)
-    if (!key.includes(req.user!.id)) {
+    if ((typeof key !== 'string' || !key.startsWith(`uploads/${req.user!.id}/`) || key.includes('..'))) {
       throw new AppError('Invalid key or unauthorized access', 403);
     }
 
@@ -110,7 +112,7 @@ export const deleteMedia = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     // Verify key belongs to current user or user is admin
-    if (!key.includes(req.user!.id) && req.user!.role !== 'admin') {
+    if ((typeof key !== 'string' || !key.startsWith(`uploads/${req.user!.id}/`) || key.includes('..')) && req.user!.role !== 'admin') {
       throw new AppError('Not authorized to delete this media', 403);
     }
 

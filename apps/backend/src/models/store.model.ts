@@ -32,6 +32,13 @@ const storeSchema = new Schema<IStore>(
       type: String,
       index: true,
     },
+    commerce: {
+      grievanceName: String, grievanceEmail: String, gstin: String, businessName: String, supportEmail: String, supportPhone: String, businessAddress: String,
+      shippingFee: { type: Number, min: 0 }, freeShippingThreshold: { type: Number, min: 0 },
+      codEnabled: Boolean, processingDays: Number, deliveryMinDays: Number, deliveryMaxDays: Number,
+      returnDays: Number, refundDays: Number,
+    },
+    seo: { title: String, description: String, image: String },
     theme: {
       primaryColor: String,
       secondaryColor: String,

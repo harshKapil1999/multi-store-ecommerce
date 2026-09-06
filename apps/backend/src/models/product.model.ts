@@ -80,7 +80,7 @@ const productSchema = new Schema<IProduct>(
     },
     description: {
       type: String,
-      required: true,
+      default: '',
     },
     featuredImage: {
       type: String,

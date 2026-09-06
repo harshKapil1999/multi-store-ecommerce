@@ -33,8 +33,8 @@ export const getAllTransactions = async (
         }
 
         const transactions = await Transaction.find(query)
-            .limit(Number(limit))
-            .skip((Number(page) - 1) * Number(limit))
+            .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
+            .skip((Math.max(1, Math.floor(Number(page) || 1)) - 1) * Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
             .sort({ createdAt: -1 });
 
         const total = await Transaction.countDocuments(query);
@@ -97,8 +97,8 @@ export const getTransactionsByStore = async (
         if (status) query.status = status;
 
         const transactions = await Transaction.find(query)
-            .limit(Number(limit))
-            .skip((Number(page) - 1) * Number(limit))
+            .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
+            .skip((Math.max(1, Math.floor(Number(page) || 1)) - 1) * Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
             .sort({ createdAt: -1 });
 
         const total = await Transaction.countDocuments(query);

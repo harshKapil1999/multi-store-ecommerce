@@ -5,6 +5,10 @@ export interface IOrder extends Omit<OrderType, '_id'>, Document { }
 
 const orderSchema = new Schema<IOrder>(
   {
+    checkoutKey: { type: String, unique: true, sparse: true },
+    checkoutFingerprint: { type: String, select: false },
+    paymentCreationStartedAt: Date,
+    inventoryStatus: { type: String, enum: ['uncommitted', 'committed', 'released', 'review'], default: 'uncommitted' },
     storeId: {
       type: String,
       required: true,

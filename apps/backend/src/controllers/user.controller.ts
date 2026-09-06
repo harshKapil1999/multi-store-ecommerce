@@ -3,15 +3,16 @@ import { validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model';
-import { Otp } from '../models/otp.model';
+import { consumeOtp, issueOtp, getJwtSecret } from '../services/otp.service';
+import { randomBytes } from 'node:crypto';
 import { mailService } from '../services/mail.service';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
-import { generateOtp } from '@repo/utils';
+
 import mongoose from 'mongoose';
 import { Order } from '../models/order.model';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -20,7 +21,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       throw new AppError('Validation failed', 400);
     }
 
-    const { email, password, name, role } = req.body;
+    const { email, password, name, otp } = req.body;
+    await consumeOtp(email, otp);
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
@@ -36,13 +38,14 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       email,
       password: hashedPassword,
       name,
-      role: role || 'customer',
+      role: 'customer',
+      emailVerified: true,
     });
 
     // Generate token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -78,6 +81,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       throw new AppError('Invalid credentials', 401);
     }
 
+    if (!user.emailVerified) throw new AppError('Verify your email with a one-time code before signing in.', 403);
+
     // Check password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
@@ -87,7 +92,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     // Generate token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -140,18 +145,14 @@ export const updateProfile = async (
     const { name, email } = req.body;
     const userId = req.user!.id;
 
-    // Check if email is already taken by another user
-    if (email) {
-      const existingUser = await User.findOne({ email, _id: { $ne: userId } });
-      if (existingUser) {
-        throw new AppError('Email already in use', 400);
-      }
+    if (email && email !== req.user!.email) {
+      throw new AppError('Email changes require verification. Sign in with the email associated with your orders.', 400);
     }
 
     // Update user
     const user = await User.findByIdAndUpdate(
       userId,
-      { $set: { name, email } },
+      { $set: { ...(name ? { name } : {}) } },
       { new: true, runValidators: true }
     ).select('-password');
 
@@ -213,21 +214,15 @@ export const changePassword = async (
 
 export const sendOtp = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new AppError('Enter a valid email and verification code.', 400);
     const email = String(req.body.email || '').trim().toLowerCase();
 
     if (!email) {
       throw new AppError('Email is required', 400);
     }
 
-    const otp = generateOtp();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Store OTP (upsert if exists)
-    await Otp.findOneAndUpdate(
-      { email, type: 'login' },
-      { otp, expiresAt },
-      { upsert: true, new: true }
-    );
+    const otp = await issueOtp(email);
 
     // Send email
     await mailService.sendOtp(email, otp);
@@ -243,6 +238,8 @@ export const sendOtp = async (req: Request, res: Response, next: NextFunction) =
 
 export const verifyOtp = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) throw new AppError('Enter a valid email and verification code.', 400);
     const email = String(req.body.email || '').trim().toLowerCase();
     const { otp, name } = req.body;
 
@@ -250,33 +247,24 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
       throw new AppError('Email and OTP are required', 400);
     }
 
-    const otpRecord = await Otp.findOne({ email, otp, type: 'login' });
-
-    if (!otpRecord) {
-      throw new AppError('Invalid or expired OTP', 400);
-    }
-
-    if (otpRecord.expiresAt < new Date()) {
-      await Otp.deleteOne({ _id: otpRecord._id });
-      throw new AppError('OTP has expired', 400);
-    }
-
-    // OTP is valid, delete it
-    await Otp.deleteOne({ _id: otpRecord._id });
+    await consumeOtp(email, otp);
 
     // Find or create user
     let user = await User.findOne({ email });
 
     if (!user) {
       // Create guest user
-      const dummyPassword = await bcrypt.hash(Math.random().toString(36), 10);
+      const dummyPassword = await bcrypt.hash(randomBytes(32).toString('hex'), 10);
       user = await User.create({
         email,
         name: name || email.split('@')[0],
         password: dummyPassword,
         role: 'customer',
+        emailVerified: true,
       });
     }
+
+    if (!user.emailVerified) { user.emailVerified = true; await user.save(); }
 
     await Order.updateMany(
       { 'customer.email': email.toLowerCase(), 'customer.userId': { $exists: false } },
@@ -286,7 +274,7 @@ export const verifyOtp = async (req: Request, res: Response, next: NextFunction)
     // Generate token
     const token = jwt.sign(
       { id: user._id, email: user.email, role: user.role },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 

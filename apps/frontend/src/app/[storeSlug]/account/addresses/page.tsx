@@ -15,13 +15,13 @@ export default function AddressesPage() {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const load = () => api.get<UserAddress[]>('/auth/addresses').then(setAddresses).catch((error) => toast.error(error.message));
+  const load = () => api.get<UserAddress[]>('/users/addresses').then(setAddresses).catch((error) => toast.error(error.message));
   useEffect(() => { void load(); }, []);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); setSaving(true);
     try {
-      const next = await api.post<UserAddress[]>('/auth/addresses', form);
+      const next = await api.post<UserAddress[]>('/users/addresses', form);
       setAddresses(next); setForm(emptyAddress); setShowForm(false); toast.success('Address saved');
     } catch (error: any) { toast.error(error.message || 'Could not save address'); }
     finally { setSaving(false); }
@@ -29,7 +29,7 @@ export default function AddressesPage() {
 
   const remove = async (id?: string) => {
     if (!id) return;
-    try { setAddresses(await api.delete<UserAddress[]>(`/auth/addresses/${id}`)); toast.success('Address removed'); }
+    try { setAddresses(await api.delete<UserAddress[]>(`/users/addresses/${id}`)); toast.success('Address removed'); }
     catch (error: any) { toast.error(error.message || 'Could not remove address'); }
   };
 

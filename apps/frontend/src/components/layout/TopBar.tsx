@@ -1,5 +1,6 @@
 "use client";
 
+import { storeHref } from '@repo/utils';
 import { useStore } from '@/lib/store-context';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -12,11 +13,11 @@ export function TopBar() {
   const { logo, text, message, links, backgroundColor } = store.topBar;
 
   return (
-    <div 
+    <div
       className="w-full h-9 flex items-center justify-between px-4 md:px-8 text-[11px] font-medium transition-colors"
-      style={{ 
+      style={{
         backgroundColor: backgroundColor || '#F5F5F5',
-        color: '#111' 
+        color: '#111'
       }}
     >
       {/* Left side: Logo or Text */}
@@ -31,7 +32,7 @@ export function TopBar() {
       </div>
 
       {/* Middle: Promotion Message */}
-      <div className="absolute left-1/2 -translate-x-1/2 hidden md:block">
+      <div className="absolute left-1/2 -translate-x-1/2 block max-w-[60%] truncate text-center">
         <p className="hover:opacity-70 cursor-pointer">{message}</p>
       </div>
 
@@ -39,8 +40,8 @@ export function TopBar() {
       <div className="flex items-center gap-4">
         {links?.map((link, idx) => (
           <div key={idx} className="flex items-center gap-4">
-            <Link 
-              href={link.href || '#'} 
+            <Link
+              href={storeHref(link.href, store.slug)}
               className="hover:underline opacity-80"
             >
               {link.label}
@@ -50,17 +51,7 @@ export function TopBar() {
             )}
           </div>
         ))}
-        {(!links || links.length === 0) && (
-          <>
-            <Link href="#" className="hover:underline opacity-80">Find a Store</Link>
-            <span className="text-gray-300">|</span>
-            <Link href="#" className="hover:underline opacity-80">Help</Link>
-            <span className="text-gray-300">|</span>
-            <Link href="#" className="hover:underline opacity-80">Join Us</Link>
-            <span className="text-gray-300">|</span>
-            <Link href="#" className="hover:underline opacity-80">Sign In</Link>
-          </>
-        )}
+
       </div>
     </div>
   );

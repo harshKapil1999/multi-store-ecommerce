@@ -1,0 +1,3 @@
+'use client';
+import Link from 'next/link';
+export default function ErrorPage({reset}:{reset:()=>void}){return <main id="main-content" className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 text-center"><h1 className="text-3xl font-semibold">We couldn’t load this page.</h1><p className="mt-4 leading-7 text-gray-500">Please try again in a moment. If you were making a payment, check your orders before trying to pay again.</p><button onClick={reset} className="mt-7 rounded-full bg-black px-7 py-3 text-white dark:bg-white dark:text-black">Try again</button><Link href="/contact" className="mt-5 text-sm underline">Contact support</Link></main>}

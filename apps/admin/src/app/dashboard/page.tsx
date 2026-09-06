@@ -1,5 +1,7 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api-client';
 import { useSelectedStore } from '@/contexts/store-context';
 import { useStores } from '@/hooks/useStores';
 import { useProducts } from '@/hooks/useProducts';
@@ -26,23 +28,25 @@ export default function Dashboard() {
   const { data: ordersData, isLoading: ordersLoading } = useOrders(selectedStoreId || undefined);
   const { data: transactionsData, isLoading: transactionsLoading } = useTransactions(selectedStoreId || undefined);
 
+  const {data: storeStats, isLoading: statsLoading, error: statsError} = useQuery({
+    queryKey: ['store-stats', selectedStoreId], enabled: !!selectedStoreId, refetchInterval: 30000,
+    queryFn: async () => (await apiClient.get(`/stores/${selectedStoreId}/stats`)).data.data
+  });
   // Safely extract data with fallbacks
-  const storeCount = stores?.pagination?.total || stores?.data?.length || 0;
-  const productCount = products?.pagination?.total || products?.data?.length || 0;
-  const categoryCount = categories?.pagination?.total || categories?.data?.length || 0;
+  const storeCount = stores?.total || stores?.data?.length || 0;
+  const productCount = products?.total || products?.data?.length || 0;
+  const categoryCount = categories?.total || categories?.data?.length || 0;
   const productsList = Array.isArray(products?.data) ? products.data : [];
   
   // Orders and Transactions processing
   const ordersList = Array.isArray(ordersData?.data) ? ordersData.data : [];
-  const transactionsList = Array.isArray(transactionsData) ? transactionsData : [];
+  const transactionsList = Array.isArray(transactionsData?.data) ? transactionsData.data : [];
 
-  const orderCount = ordersData?.total || ordersList.length;
-  const totalRevenue = transactionsList
-    .filter((t: any) => t.status === 'captured')
-    .reduce((acc: number, t: any) => acc + t.amount, 0);
+  const orderCount = storeStats?.orders || 0;
+  const totalRevenue = storeStats?.revenue || 0;
 
   // Show error state if any critical data fetch fails
-  if (storesError || (productsError && selectedStoreId) || (categoriesError && selectedStoreId)) {
+  if (statsError || storesError || (productsError && selectedStoreId) || (categoriesError && selectedStoreId)) {
     return (
       <div className="space-y-6 p-8">
         <div>
@@ -132,14 +136,15 @@ export default function Dashboard() {
     {
         title: 'Revenue',
         value: `₹${totalRevenue.toLocaleString('en-IN')}`,
-        description: 'Total captured',
-        loading: transactionsLoading,
+        description: 'Paid orders including collected COD',
+        loading: statsLoading,
         icon: ArrowUpRight,
     }
   ];
 
   return (
     <div className="space-y-8">
+      {storeStats?.reviewOrders > 0 && <Link href="/dashboard/orders" className="block rounded-lg bg-amber-50 p-4 text-amber-900">{storeStats.reviewOrders} paid order(s) need inventory review before dispatch. Open orders.</Link>}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">

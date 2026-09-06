@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { User } from '../models/user.model';
+import { getJwtSecret } from '../services/otp.service';
 import { AppError } from './error-handler';
 
 interface JwtPayload {
@@ -33,7 +35,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       const SESSION_SECRET = process.env.SESSION_SECRET;
       if (SESSION_SECRET && token) {
         try {
-          const sessionPayload = jwt.verify(token, SESSION_SECRET) as unknown as JwtPayload;
+          const sessionPayload = jwt.verify(token, SESSION_SECRET, { algorithms: ['HS256'] }) as unknown as JwtPayload;
           req.user = {
             id: sessionPayload.userId || sessionPayload.id,
             email: sessionPayload.email,
@@ -51,15 +53,13 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       throw new AppError('Authentication required', 401);
     }
 
-    const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+    const JWT_SECRET = getJwtSecret();
     
-    const decoded = jwt.verify(token, JWT_SECRET) as unknown as JwtPayload;
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as unknown as JwtPayload;
 
-    req.user = {
-      id: decoded.id,
-      email: decoded.email,
-      role: decoded.role,
-    };
+    const user = await User.findById(decoded.id).select('email role emailVerified').lean();
+    if (!user?.emailVerified) throw new AppError('Email verification required', 401);
+    req.user = { id: String(user._id), email: user.email, role: user.role };
 
     next();
   } catch (error) {

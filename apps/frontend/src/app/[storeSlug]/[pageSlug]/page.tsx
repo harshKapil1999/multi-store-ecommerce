@@ -1,3 +1,6 @@
+import { PolicyPage } from '@/components/policies/PolicyPage';
+import { POLICY_TITLES } from '@/lib/policies';
+import { getStore, pageMetadata } from '@/lib/seo';
 import { notFound } from 'next/navigation';
 import type { Billboard, Category, Page, PageSection, Product, Store } from '@repo/types';
 import { api } from '@/lib/api';
@@ -53,12 +56,21 @@ async function loadSection(store: Store, section: PageSection) {
   return { section };
 }
 
+export async function generateMetadata({ params }: StorePageProps) {
+  const { storeSlug, pageSlug } = await params;
+  const store = await getStore(storeSlug).catch(() => null);
+  if (!store) return { title: 'Page not found', robots: { index: false } };
+  const page = await api.get<Page>(`/stores/${store._id}/pages/slug/${pageSlug}`).catch(() => null);
+  return pageMetadata(page?.metaTitle || page?.title || POLICY_TITLES[pageSlug] || 'Page not found', page?.metaDescription || page?.description || `${POLICY_TITLES[pageSlug] || 'Information'} from Crabtile.`, `/${storeSlug}/${pageSlug}`);
+}
+
 export default async function PublishedStorePage({ params }: StorePageProps) {
   const { storeSlug, pageSlug } = await params;
   const store = await api.get<Store>(`/stores/slug/${storeSlug}`).catch(() => null);
   if (!store) notFound();
 
   const page = await api.get<Page>(`/stores/${store._id}/pages/slug/${pageSlug}`).catch(() => null);
+  if (!page && POLICY_TITLES[pageSlug]) return <PolicyPage slug={pageSlug} settings={store.commerce} storeSlug={storeSlug} />;
   if (!page) notFound();
 
   const loadedSections = await Promise.all(

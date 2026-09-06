@@ -59,6 +59,7 @@ export function DataTable<TData>({
   globalFilter = '',
   onGlobalFilterChange,
 }: DataTableProps<TData>) {
+  const [localFilter, setLocalFilter] = useState('');
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -82,7 +83,7 @@ export function DataTable<TData>({
     onPaginationChange: (updater) => {
       const newPagination =
         typeof updater === 'function'
-          ? updater({ pageIndex: pagination.pageIndex, pageSize: pagination.pageSize })
+          ? updater(onPaginationChange ? { pageIndex, pageSize } : pagination)
           : updater;
       setPagination(newPagination);
       onPaginationChange?.(newPagination);
@@ -92,24 +93,24 @@ export function DataTable<TData>({
       columnFilters,
       columnVisibility,
       rowSelection,
-      globalFilter,
-      pagination,
+      globalFilter: onGlobalFilterChange ? globalFilter : localFilter,
+      pagination: onPaginationChange ? { pageIndex, pageSize } : pagination,
     },
     globalFilterFn: 'auto',
-    manualPagination: !!pageCount,
+    manualPagination: pageCount !== undefined,
     pageCount,
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      {(pageCount === undefined || onGlobalFilterChange) && <div className="flex items-center gap-2">
         <Input
           placeholder="Search..."
-          value={globalFilter}
-          onChange={(e) => onGlobalFilterChange?.(e.target.value)}
+          value={onGlobalFilterChange ? globalFilter : localFilter}
+          onChange={(e) => (onGlobalFilterChange || setLocalFilter)(e.target.value)}
           className="max-w-sm"
         />
-      </div>
+      </div>}
 
       <div className="rounded-md border overflow-hidden">
         <Table>

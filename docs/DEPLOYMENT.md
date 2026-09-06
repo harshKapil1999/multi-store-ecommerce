@@ -411,6 +411,8 @@ payment.captured
 payment.failed
 order.paid
 refund.created
+refund.processed
+refund.failed
 ```
 
 The dashboard webhook secret must exactly match the value in
@@ -429,7 +431,7 @@ endpoints.
 7. Test store discovery, search, product pages, wishlist, and cart isolation.
 8. Complete a Razorpay test payment and verify one order and one transaction.
 9. Confirm the customer order email, invoice email, and admin order view.
-10. Test order tracking with the order email and identifier.
+10. Test order tracking while signed in with the verified customer email.
 11. Check Cloud Run and Vercel logs for new errors.
 12. Record the deployed Git commit and deployment URLs in the release notes.
 

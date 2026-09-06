@@ -7,16 +7,13 @@ import { z } from 'zod';
 import { Button, Card, FormInput, FormTextarea, MediaUpload, BillboardSelect, FormCheckbox } from '@/components/index';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { CreateStoreRequest, UpdateStoreRequest, Store, HomeSectionConfig } from '@repo/types';
-import { DEFAULT_HOME_SECTIONS } from '@repo/types';
+import { DEFAULT_HOME_SECTIONS, DEFAULT_COMMERCE_SETTINGS } from '@repo/types';
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react';
 import { useCategories } from '@/hooks/useCategories';
 import { useProducts } from '@/hooks/useProducts';
 
 const normalizeHomeSections = (sections?: HomeSectionConfig[]) =>
-  DEFAULT_HOME_SECTIONS.map((fallback) => ({
-    ...fallback,
-    ...(sections?.find((section) => section.type === fallback.type) || {}),
-  })).sort((a, b) => a.order - b.order);
+  [...(sections === undefined ? DEFAULT_HOME_SECTIONS : sections)].sort((a, b) => a.order - b.order);
 
 const storeSchema = z.object({
   name: z.string().min(1, 'Store name is required'),
@@ -25,6 +22,8 @@ const storeSchema = z.object({
   description: z.string().optional(),
   logo: z.string().optional(),
   homeBillboards: z.array(z.string()).optional(),
+  commerce: z.object({ businessName: z.string().min(1), supportEmail: z.string().email(), supportPhone: z.string().optional(), grievanceName: z.string().optional(), grievanceEmail: z.string().optional(), gstin: z.string().optional(), businessAddress: z.string().min(1), shippingFee: z.number().min(0), freeShippingThreshold: z.number().min(0), codEnabled: z.boolean(), processingDays: z.number().int().min(0), deliveryMinDays: z.number().int().min(1), deliveryMaxDays: z.number().int().min(1), returnDays: z.number().int().min(1), refundDays: z.number().int().min(1) }),
+  seo: z.object({ title: z.string().max(70).optional(), description: z.string().max(180).optional(), image: z.string().optional() }).optional(),
   topBar: z.object({
     isVisible: z.boolean().default(true),
     text: z.string().optional().default(''),
@@ -76,6 +75,8 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
     resolver: zodResolver(storeSchema),
     defaultValues: store
       ? {
+          commerce: { ...DEFAULT_COMMERCE_SETTINGS, ...store.commerce },
+          seo: store.seo || {},
           name: store.name,
           slug: store.slug,
           domain: store.domain,
@@ -92,6 +93,8 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
           },
         }
       : {
+          commerce: DEFAULT_COMMERCE_SETTINGS,
+          seo: {},
           name: '',
           slug: '',
           homeBillboards: [],
@@ -142,8 +145,8 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
     const cleanedData = {
       ...data,
       domain: data.domain || undefined,
-      description: data.description || undefined,
-      logo: data.logo || undefined,
+      description: data.description || '',
+      logo: data.logo || '',
     };
     await onSubmit(cleanedData);
   };
@@ -189,6 +192,31 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
         </div>
       </Card>
 
+      <Card className="p-6 space-y-5">
+        <h3 className="text-lg font-semibold">Business, shipping & returns</h3>
+        <p className="text-sm text-muted-foreground">These details appear on your contact and policy pages. Shipping fees are also used at checkout. Review them before accepting orders.</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <FormInput label="Legal business name" {...register('commerce.businessName')} />
+          <FormInput label="Support email" type="email" {...register('commerce.supportEmail')} />
+          <FormInput label="Support phone (optional)" {...register('commerce.supportPhone')} />
+          <FormInput label="Grievance officer name" {...register('commerce.grievanceName')} />
+          <FormInput label="Grievance contact email" {...register('commerce.grievanceEmail')} />
+          <FormInput label="GSTIN (if registered)" {...register('commerce.gstin')} />
+          <FormInput label="Business / correspondence address" {...register('commerce.businessAddress')} />
+          {([
+            ['shippingFee', 'Shipping fee (₹)'], ['freeShippingThreshold', 'Free shipping from (₹)'],
+            ['processingDays', 'Dispatch within (business days)'], ['deliveryMinDays', 'Delivery minimum (business days)'],
+            ['deliveryMaxDays', 'Delivery maximum (business days)'], ['returnDays', 'Return request window (days)'], ['refundDays', 'Refund processing maximum (business days)'],
+          ] as const).map(([field, label]) => <FormInput key={field} label={label} type="number" min={0} {...register(`commerce.${field}`, { valueAsNumber: true })} />)}
+        </div>
+        <Controller name="commerce.codEnabled" control={control} render={({ field }) => <FormCheckbox label="Offer cash on delivery" checked={field.value} onCheckedChange={field.onChange} />} />
+      </Card>
+      <Card className="p-6 space-y-4">
+        <h3 className="text-lg font-semibold">Search engine appearance</h3>
+        <FormInput label="SEO title (up to 70 characters)" maxLength={70} {...register('seo.title')} />
+        <FormTextarea label="SEO description (up to 180 characters)" maxLength={180} {...register('seo.description')} />
+        <FormInput label="Social sharing image URL (optional)" type="url" {...register('seo.image')} />
+      </Card>
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Store Logo</h3>
         <div className="space-y-4">
@@ -319,6 +347,9 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
             </p>
           </div>
 
+          <div className="mb-5 flex flex-wrap gap-2">
+            {DEFAULT_HOME_SECTIONS.map((template) => <Button key={template.type} type="button" variant="outline" size="sm" disabled={homeSections.length >= 12} onClick={() => setValue('homeSections', [...homeSections, { ...template, id: crypto.randomUUID(), order: homeSections.length, isVisible: true }], { shouldDirty: true })}><Plus className="mr-1 h-3 w-3" />{template.title}</Button>)}
+          </div>
           <div className="space-y-4">
             {homeSections.map((section: HomeSectionConfig, index: number) => {
               const usesCategories = section.type === 'featured_categories' || section.type === 'category_collection';
@@ -340,6 +371,7 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
                       <p className="text-xs text-muted-foreground">Position {index + 1}</p>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button type="button" variant="ghost" size="icon" aria-label="Remove section" onClick={() => setValue('homeSections', homeSections.filter((_: unknown, i: number) => i !== index).map((item: HomeSectionConfig, order: number) => ({ ...item, order })), { shouldDirty: true })}><X className="h-4 w-4" /></Button>
                       <FormCheckbox
                         label="Visible"
                         checked={section.isVisible}
@@ -397,7 +429,14 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
                             <p className="text-sm text-muted-foreground">No catalog items available yet.</p>
                           )}
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">Leave all unchecked to use featured items automatically.</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Leave unchecked for automatic selection. Selected items appear in the order below. Edit images in Categories or Products.</p>
+                        <div className="mt-3 space-y-1">
+                          {(section[usesCategories ? 'categoryIds' : 'productIds'] || []).map((id, selectedIndex, ids) => {
+                            const field = usesCategories ? 'categoryIds' : 'productIds';
+                            const move = (direction: number) => { const next = [...ids]; const target = selectedIndex + direction; [next[selectedIndex], next[target]] = [next[target], next[selectedIndex]]; updateSection(index, { [field]: next }); };
+                            return <div key={id} className="flex items-center justify-between gap-2 text-sm"><span>{selectedIndex + 1}. {(usesCategories ? categories : products).find((item: any) => item._id === id)?.name || 'Selected catalog item'}</span><span><Button type="button" size="icon" variant="ghost" disabled={selectedIndex === 0} aria-label="Move item up" onClick={() => move(-1)}><ArrowUp className="h-3 w-3" /></Button><Button type="button" size="icon" variant="ghost" disabled={selectedIndex === ids.length - 1} aria-label="Move item down" onClick={() => move(1)}><ArrowDown className="h-3 w-3" /></Button></span></div>;
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}

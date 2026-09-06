@@ -31,6 +31,8 @@ export default function AccountOrdersPage() {
   const params = useParams<{ storeSlug: string }>();
   const { isAuthenticated } = useAuth();
   const { store } = useStore();
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,8 @@ export default function AccountOrdersPage() {
 
       try {
         setLoading(true);
-        const response = await api.get<OrdersResponse>(`/orders?storeId=${store._id}`);
+        const response = await api.get<OrdersResponse>(`/orders?storeId=${store._id}&page=${page}&limit=20`);
+        setTotalPages(response.totalPages || 1); setError(null);
         setOrders(Array.isArray(response.data) ? response.data : []);
       } catch (fetchError: any) {
         setError(fetchError.message || 'Failed to load orders');
@@ -54,7 +57,7 @@ export default function AccountOrdersPage() {
     };
 
     fetchOrders();
-  }, [isAuthenticated, store?._id]);
+  }, [isAuthenticated, store?._id, page]);
 
   if (!isAuthenticated) {
     return (
@@ -109,6 +112,7 @@ export default function AccountOrdersPage() {
         </Link>
       </div>
 
+      {totalPages > 1 && <nav aria-label="Order pages" className="flex items-center gap-4"><Button disabled={page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span>Page {page} of {totalPages}</span><Button disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button></nav>}
       {orders.length === 0 ? (
         <div className="rounded-3xl border border-gray-100 dark:border-white/5 bg-white dark:bg-zinc-900 p-10 text-center shadow-sm">
           <Package size={42} className="mx-auto mb-4 text-gray-400" />
@@ -165,7 +169,7 @@ export default function AccountOrdersPage() {
                   <p className="text-xs uppercase tracking-widest text-gray-400 mb-2">Payment Method</p>
                   <p className="font-semibold capitalize">{order.paymentMethod || 'razorpay'}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {order.transactionId ? `Transaction ${order.transactionId.slice(-8)}` : 'Awaiting payment confirmation'}
+                    {order.paymentMethod === 'cod' ? 'Cash on delivery' : order.transactionId ? `Transaction ${order.transactionId.slice(-8)}` : 'Awaiting payment confirmation'}
                   </p>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Page } from '../models/page.model';
 import type { CreatePageInput, UpdatePageInput, AddPageSectionInput, UpdatePageSectionInput } from '@repo/types';
 import sanitizeHtml from 'sanitize-html';
@@ -40,7 +41,7 @@ export const getPages = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch pages',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -78,7 +79,7 @@ export const getPage = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch page',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -107,7 +108,7 @@ export const getPageBySlug = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch page',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -136,7 +137,7 @@ export const getHomePage = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch home page',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -171,7 +172,7 @@ export const createPage = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to create page',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -216,7 +217,7 @@ export const updatePage = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update page',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -245,7 +246,7 @@ export const deletePage = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete page',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -278,7 +279,7 @@ export const togglePublish = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to toggle publish status',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -311,7 +312,7 @@ export const addSection = async (req: Request, res: Response) => {
 
     page.sections.push({
       ...sectionData,
-      _id: new Date().getTime().toString(),
+      _id: new mongoose.Types.ObjectId().toString(),
       order: sectionData.order ?? (maxOrder + 1),
       isVisible: sectionData.isVisible ?? true,
     } as any);
@@ -327,7 +328,7 @@ export const addSection = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to add section',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -364,7 +365,7 @@ export const updateSection = async (req: Request, res: Response) => {
 
     // Update section
     page.sections[sectionIndex] = {
-      ...page.sections[sectionIndex],
+      ...(page.sections[sectionIndex] as any).toObject(),
       ...sectionData,
     } as any;
 
@@ -379,7 +380,7 @@ export const updateSection = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update section',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -413,7 +414,7 @@ export const deleteSection = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to delete section',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };
@@ -434,6 +435,8 @@ export const reorderSections = async (req: Request, res: Response) => {
         message: 'Page not found',
       });
     }
+
+    if (!Array.isArray(sectionIds) || sectionIds.length !== page.sections.length || new Set(sectionIds).size !== sectionIds.length || sectionIds.some(id => !page.sections.some(s => String(s._id) === id))) return res.status(400).json({ success: false, message: 'Include each section exactly once.' });
 
     // Reorder sections based on sectionIds array
     const reorderedSections = sectionIds.map((id, index) => {
@@ -457,7 +460,7 @@ export const reorderSections = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       message: 'Failed to reorder sections',
-      error: error.message,
+      ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {}),
     });
   }
 };

@@ -26,7 +26,7 @@ export function LoginModal({ isOpen, onClose, onSuccess }: LoginModalProps) {
     setLoading(true);
 
     try {
-      const response = await api.post<any>('/auth/login', { email, password });
+      const response = await api.post<any>('/users/login', { email, password });
       
       if (response.token && response.user) {
         setAuth(response.user, response.token);

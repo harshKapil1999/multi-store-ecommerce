@@ -21,7 +21,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
         <div className="w-full">
           <UserRound className="mx-auto h-12 w-12" />
           <h1 className="mt-6 text-4xl font-black tracking-tight">Your account</h1>
-          <p className="mt-3 text-gray-500 dark:text-gray-400">Sign in with your verified email to see orders, invoices, delivery tracking, profile, and saved addresses.</p>
+          <p className="mt-3 text-gray-500 dark:text-gray-400">Sign in with your verified email to see orders, receipts, delivery tracking, profile, and saved addresses.</p>
           <Button className="mt-8 rounded-full px-10" onClick={() => setShowLogin(true)}>Sign in with email</Button>
           <OtpModal isOpen={showLogin} onClose={() => setShowLogin(false)} onSuccess={() => setShowLogin(false)} />
         </div>
@@ -31,7 +31,7 @@ export function AccountShell({ children }: { children: React.ReactNode }) {
 
   const links = [
     { href: `/${storeSlug}/account`, label: 'Overview', icon: UserRound },
-    { href: `/${storeSlug}/account/orders`, label: 'Orders & invoices', icon: Package },
+    { href: `/${storeSlug}/account/orders`, label: 'Orders & receipts', icon: Package },
     { href: `/${storeSlug}/account/addresses`, label: 'Addresses', icon: MapPin },
     { href: `/${storeSlug}/account/profile`, label: 'Profile', icon: UserRound },
   ];

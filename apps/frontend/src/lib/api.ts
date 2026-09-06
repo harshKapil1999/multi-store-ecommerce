@@ -1,3 +1,4 @@
+import { useAuth } from './auth-store';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export async function fetcher<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -5,6 +6,7 @@ export async function fetcher<T>(endpoint: string, options: RequestInit = {}): P
     const { headers, ...requestOptions } = options;
 
     const res = await fetch(`${API_URL}${endpoint}`, {
+        signal: AbortSignal.timeout(20000),
         cache: 'no-store',
         ...requestOptions,
         headers: {
@@ -25,7 +27,8 @@ export async function fetcher<T>(endpoint: string, options: RequestInit = {}): P
     const data = await res.json();
 
     if (!res.ok) {
-        throw new Error(data.message || data.error || `Request failed with status ${res.status}.`);
+        if (res.status === 401 && typeof window !== 'undefined') useAuth.getState().logout();
+        throw Object.assign(new Error(data.message || data.error || `Request failed with status ${res.status}.`), { status: res.status });
     }
 
     return data.data || data;

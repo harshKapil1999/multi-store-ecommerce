@@ -235,7 +235,7 @@ export function ProductsPage() {
           isLoading={isLoading}
           pageIndex={(filters.page || 1) - 1}
           pageSize={filters.limit || 20}
-          pageCount={data?.pagination?.pages || 1}
+          pageCount={data?.totalPages || 1}
           onPaginationChange={(pagination) => {
             setFilters({
               ...filters,

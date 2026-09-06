@@ -25,11 +25,14 @@ export const getVariantsByProduct = async (
         const { productId } = req.params;
 
         const product = await Product.findById(productId);
-        if (!product || !product.isActive) {
+        if (!product || !(await Store.exists({ _id: product.storeId, isActive: true }))) {
             throw new AppError('Product not found', 404);
         }
 
-        const variants = await ProductVariant.find({ productId, isActive: true });
+        const user = (req as AuthRequest).user;
+        const canManage = user && (user.role === 'admin' || await Store.exists({ _id: product.storeId, owner: user.id }));
+        if (!product.isActive && !canManage) throw new AppError('Product not found', 404);
+        const variants = await ProductVariant.find({ productId, ...(!canManage ? { isActive: true } : {}) });
 
         res.json({ success: true, data: variants });
     } catch (error) {
@@ -49,6 +52,8 @@ export const getVariantById = async (
             throw new AppError('Variant not found', 404);
         }
 
+        const product = await Product.findById(variant.productId);
+        if (!variant.isActive || !product?.isActive || !(await Store.exists({ _id: product.storeId, isActive: true }))) throw new AppError('Variant not found', 404);
         res.json({ success: true, data: variant });
     } catch (error) {
         next(error);
@@ -179,7 +184,7 @@ export const updateVariantStock = async (
     try {
         const { stock } = req.body;
 
-        if (stock === undefined || stock < 0) {
+        if (!Number.isSafeInteger(stock) || stock < 0) {
             throw new AppError('Invalid stock value', 400);
         }
 
@@ -212,7 +217,7 @@ export const bulkCreateVariants = async (
         const { productId } = req.params;
         const { variants } = req.body;
 
-        if (!Array.isArray(variants) || variants.length === 0) {
+        if (!Array.isArray(variants) || variants.length === 0 || variants.length > 100) {
             throw new AppError('Variants array is required', 400);
         }
 

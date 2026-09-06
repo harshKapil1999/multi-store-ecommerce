@@ -1,3 +1,4 @@
+import { Pagination } from '@/components/shop/Pagination';
 import Link from 'next/link';
 import { Search, ArrowLeft } from 'lucide-react';
 import type { Product, Store } from '@repo/types';
@@ -25,7 +26,7 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
   }
 
   return (
-    <main className="min-h-screen bg-white px-4 pb-20 pt-28 text-gray-950 dark:bg-black dark:text-white md:px-8">
+    <div className="min-h-screen bg-white px-4 pb-20 pt-10 text-gray-950 dark:bg-black dark:text-white md:px-8">
       <div className="mx-auto max-w-7xl">
         <Link href={`/${storeSlug}`} className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-current">
           <ArrowLeft className="h-4 w-4" />
@@ -76,7 +77,8 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
         ) : (
           <div className="py-24 text-center text-gray-500">Enter a product name or keyword to search this store.</div>
         )}
+        <Pagination page={page} totalPages={result.totalPages} basePath={`/${storeSlug}/search`} query={{ q: query }} />
       </div>
-    </main>
+    </div>
   );
 }

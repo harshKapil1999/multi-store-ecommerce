@@ -79,6 +79,7 @@ export class PaymentService {
     }): boolean {
         try {
             const { orderId, paymentId, signature } = params;
+            if (!/^[a-f0-9]{64}$/i.test(signature)) return false;
 
             const generatedSignature = crypto
                 .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
@@ -116,7 +117,8 @@ export class PaymentService {
             });
             return refund;
         } catch (error) {
-            throw new AppError(`Refund failed: ${getRazorpayErrorMessage(error)}`, 502);
+            const code = (error as RazorpayError)?.statusCode;
+            throw new AppError(`Razorpay rejected the refund: ${getRazorpayErrorMessage(error)}. Check the Razorpay dashboard before retrying.`, code && [400, 401, 403, 404, 422].includes(code) ? 400 : 502);
         }
     }
 

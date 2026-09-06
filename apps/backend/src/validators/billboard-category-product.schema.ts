@@ -3,8 +3,8 @@ import { z } from 'zod';
 export const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // Helper for optional URL fields that transforms empty strings to undefined
-const optionalUrl = z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val);
-const optionalString = z.string().optional().or(z.literal('')).transform(val => val === '' ? undefined : val);
+const optionalUrl = z.string().optional().or(z.literal(''));
+const optionalString = z.string().optional().or(z.literal(''));
 
 // Billboard Schemas
 export const createBillboardSchema = z.object({
@@ -13,7 +13,7 @@ export const createBillboardSchema = z.object({
   imageUrl: z.string().url('imageUrl must be a valid URL'),
   categoryId: optionalString,
   ctaText: optionalString,
-  ctaLink: optionalUrl,
+  ctaLink: z.string().refine((value) => !value || (!/[\\\s]/.test(value) && !value.startsWith('//') && (value.startsWith('/') || /^https:\/\//i.test(value))), 'Use a store path or HTTPS URL').optional(),
   order: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
 });
@@ -108,8 +108,8 @@ export const listProductsQuerySchema = z.object({
   category: z.string().optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
-  isFeatured: z.coerce.boolean().optional(),
-  includeInactive: z.coerce.boolean().optional(),
+  isFeatured: z.enum(['true', 'false']).optional(),
+  includeInactive: z.enum(['true', 'false']).optional(),
   sortBy: z.enum(['createdAt', 'name', 'sellingPrice']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
 });

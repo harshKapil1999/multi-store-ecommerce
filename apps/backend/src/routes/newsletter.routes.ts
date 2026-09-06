@@ -8,4 +8,6 @@ const router: Router = Router({ mergeParams: true });
 router.post('/', newsletterController.subscribe);
 router.get('/', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, newsletterController.listSubscribers);
 
+router.delete('/', authenticate, newsletterController.unsubscribe);
+
 export default router;

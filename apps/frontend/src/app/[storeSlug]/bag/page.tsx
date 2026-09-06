@@ -1,5 +1,6 @@
 "use client";
 
+import { getShipping } from '@repo/types';
 import { useCart } from '@/lib/cart-store';
 import { useStore } from '@/lib/store-context';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +16,7 @@ export default function BagPage() {
 
   const storeItems = store ? items.filter((item) => item.storeId === store._id) : [];
   const subtotal = store ? getSubtotal(store._id) : 0;
-  const delivery = subtotal === 0 || subtotal > 2500 ? 0 : 750;
+  const delivery = subtotal === 0 ? 0 : getShipping(subtotal, store?.commerce);
   const total = subtotal + delivery;
 
   if (!store) return null;

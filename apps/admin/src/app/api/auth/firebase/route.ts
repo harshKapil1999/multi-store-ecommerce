@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const decodedToken = await verifyFirebaseIdToken(idToken);
     const email = decodedToken.email?.toLowerCase();
 
-    if (!email) {
+    if (!email || !decodedToken.email_verified) {
       return NextResponse.json({ message: 'Firebase user email is required' }, { status: 400 });
     }
 

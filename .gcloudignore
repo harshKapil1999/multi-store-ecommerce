@@ -1,0 +1,17 @@
+.gcloudignore
+.git
+.gitignore
+.local-backups
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/.vercel
+.vercel
+.turbo
+**/.env
+**/.env.*
+.env
+.env.*
+*.log
+coverage

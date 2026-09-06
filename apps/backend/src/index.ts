@@ -24,6 +24,7 @@ import variantRoutes from './routes/variant.routes';
 import transactionRoutes from './routes/transaction.routes';
 import paymentRoutes from './routes/payment.routes';
 import customerRoutes from './routes/customer.routes';
+import { optionalAuthenticate } from './middleware/auth';
 import { apiRateLimit } from './middleware/rate-limit';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -54,13 +55,13 @@ const PORT = process.env.PORT || 4000;
 app.disable('x-powered-by');
 if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: false }));
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',').filter(Boolean);
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',').map((origin) => origin.trim()).filter(Boolean);
 const isLocalDevOrigin = (origin: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || (process.env.NODE_ENV !== 'production' && isLocalDevOrigin(origin))) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}`);
@@ -72,14 +73,18 @@ app.use(cors({
 app.use(express.json({
   limit: '1mb',
   verify: (req, _res, buffer) => {
-    if (req.url === '/api/v1/payment/webhook') {
+    if (req.url?.split('?')[0] === '/api/v1/payment/webhook') {
       (req as express.Request & { rawBody?: string }).rawBody = buffer.toString('utf8');
     }
   },
 }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false, limit: '64kb', parameterLimit: 100 }));
 app.use(cookieParser());
-app.use(morgan('dev'));
+app.use(morgan(':method :url :status :response-time ms', { skip: (req) => /users|orders|customers|transactions|payment/.test(req.originalUrl) }));
+app.use('/api/v1', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  next();
+});
 app.use('/api/v1', apiRateLimit);
 
 // Routes
@@ -113,12 +118,12 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/stores', storeRoutes);
 
 // Store-scoped APIs with context validation
-app.use('/api/v1/stores/:storeId/billboards', validateStoreContext, billboardRoutes);
-app.use('/api/v1/stores/:storeId/categories', validateStoreContext, categoryRoutes);
-app.use('/api/v1/stores/:storeId/products', validateStoreContext, productRoutes);
-app.use('/api/v1/stores/:storeId/pages', validateStoreContext, pageRoutes);
-app.use('/api/v1/stores/:storeId/newsletter', validateStoreContext, newsletterRoutes);
-app.use('/api/v1/stores/:storeId/customers', validateStoreContext, customerRoutes);
+app.use('/api/v1/stores/:storeId/billboards', optionalAuthenticate, validateStoreContext, billboardRoutes);
+app.use('/api/v1/stores/:storeId/categories', optionalAuthenticate, validateStoreContext, categoryRoutes);
+app.use('/api/v1/stores/:storeId/products', optionalAuthenticate, validateStoreContext, productRoutes);
+app.use('/api/v1/stores/:storeId/pages', optionalAuthenticate, validateStoreContext, pageRoutes);
+app.use('/api/v1/stores/:storeId/newsletter', optionalAuthenticate, validateStoreContext, newsletterRoutes);
+app.use('/api/v1/stores/:storeId/customers', optionalAuthenticate, validateStoreContext, customerRoutes);
 
 // Other routes
 app.use('/api/v1/orders', orderRoutes);
@@ -167,7 +172,7 @@ async function startServer() {
   process.once('SIGINT', () => shutdown('SIGINT'));
 }
 
-startServer().catch((error) => {
+if (require.main === module) startServer().catch((error) => {
   console.error('Backend startup failed:', error);
   process.exit(1);
 });

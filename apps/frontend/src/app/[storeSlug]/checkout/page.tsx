@@ -12,6 +12,7 @@ import { OtpModal } from '@/components/auth/OtpModal';
 import { useAuth } from '@/lib/auth-store';
 import { User, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getShipping, DEFAULT_COMMERCE_SETTINGS } from '@repo/types';
 import type { UserAddress } from '@repo/types';
 
 declare global {
@@ -32,7 +33,7 @@ export default function CheckoutPage() {
   const { user, isAuthenticated } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const [pendingOnlineOrder, setPendingOnlineOrder] = useState<PendingOnlineOrder | null>(null);
+
   const [savedAddresses, setSavedAddresses] = useState<UserAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState('');
   const [saveAddressForFuture, setSaveAddressForFuture] = useState(true);
@@ -48,6 +49,8 @@ export default function CheckoutPage() {
     pincode: user?.addresses?.[0]?.postalCode || '',
     state: user?.addresses?.[0]?.state || '',
   });
+
+  useEffect(() => { if (user?.email) setFormData(current => ({ ...current, email: user.email })); }, [user?.email]);
 
   const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay');
 
@@ -71,7 +74,7 @@ export default function CheckoutPage() {
 
     let isCurrent = true;
 
-    api.get<UserAddress[]>('/auth/addresses')
+    api.get<UserAddress[]>('/users/addresses')
       .then((addresses) => {
         if (!isCurrent) return;
 
@@ -90,13 +93,13 @@ export default function CheckoutPage() {
 
   const storeItems = store ? items.filter((item) => item.storeId === store._id) : [];
   const subtotal = store ? getSubtotal(store._id) : 0;
-  const delivery = subtotal > 2500 ? 0 : 750; // Updated delivery fee to be more realistic
+  const settings = { ...DEFAULT_COMMERCE_SETTINGS, ...store?.commerce };
+  const delivery = getShipping(subtotal, store?.commerce);
   const total = subtotal + delivery;
 
   const buildOrderSuccessUrl = (storeSlug: string, orderId: string, transactionId?: string) => {
     const params = new URLSearchParams({
       orderId,
-      email: formData.email,
     });
 
     if (transactionId) {
@@ -123,7 +126,7 @@ export default function CheckoutPage() {
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Unable to load Razorpay checkout'));
+    script.onerror = () => { script.remove(); reject(new Error('Unable to load Razorpay checkout. Please retry.')); };
     document.body.appendChild(script);
   });
 
@@ -161,7 +164,7 @@ export default function CheckoutPage() {
     if (!isAuthenticated || selectedAddressId || !saveAddressForFuture) return;
 
     try {
-      const addresses = await api.post<UserAddress[]>('/auth/addresses', {
+      const addresses = await api.post<UserAddress[]>('/users/addresses', {
         firstName: formData.firstName,
         lastName: formData.lastName,
         address1: formData.address,
@@ -185,6 +188,8 @@ export default function CheckoutPage() {
   const processOrder = async () => {
     setLoading(true);
     try {
+      const verifiedUser = useAuth.getState().user;
+      if (!verifiedUser) { setShowOtpModal(true); return; }
       // 1. Create order in backend
       const orderPayload = {
         storeId: store._id,
@@ -197,7 +202,7 @@ export default function CheckoutPage() {
         customer: {
           firstName: formData.firstName,
           lastName: formData.lastName,
-          email: formData.email,
+          email: verifiedUser.email,
           phone: formData.phone,
         },
         shippingAddress: {
@@ -223,21 +228,19 @@ export default function CheckoutPage() {
         paymentMethod: paymentMethod,
       };
 
-      let order: PendingOnlineOrder;
-
-      if (paymentMethod === 'razorpay' && pendingOnlineOrder) {
-        order = pendingOnlineOrder;
-      } else {
-        order = await api.post<PendingOnlineOrder>('/orders', orderPayload);
-        await persistCheckoutAddress();
-
-        if (paymentMethod === 'razorpay') {
-          setPendingOnlineOrder(order);
-        }
-      }
+      const fingerprint = JSON.stringify(orderPayload);
+      const storageKey = `checkout:${store._id}:${verifiedUser._id}`;
+      let previous: { fingerprint: string; checkoutKey: string; order?: PendingOnlineOrder } | null = null;
+      try { previous = JSON.parse(sessionStorage.getItem(storageKey) || 'null'); } catch { /* Start a fresh checkout. */ }
+      const checkout = previous?.fingerprint === fingerprint ? previous : { fingerprint, checkoutKey: crypto.randomUUID() };
+      sessionStorage.setItem(storageKey, JSON.stringify(checkout));
+      const order = checkout.order || await api.post<PendingOnlineOrder>('/orders', { ...orderPayload, checkoutKey: checkout.checkoutKey });
+      sessionStorage.setItem(storageKey, JSON.stringify({ ...checkout, order }));
+      await persistCheckoutAddress();
 
       // 2. Handle based on payment method
       if (paymentMethod === 'cod') {
+        sessionStorage.removeItem(storageKey);
         clearCart(store._id);
         router.push(buildOrderSuccessUrl(store.slug, order._id));
         return;
@@ -281,7 +284,7 @@ export default function CheckoutPage() {
               const verifyResult = await api.post<any>('/payment/verify', verifyPayload);
 
               if (verifyResult) {
-                setPendingOnlineOrder(null);
+                sessionStorage.removeItem(storageKey);
                 clearCart(store._id);
                 router.replace(buildOrderSuccessUrl(store.slug, verifyResult.orderId || order._id, verifyResult.transactionId || razorpayData.transactionId));
                 resolve();
@@ -293,16 +296,16 @@ export default function CheckoutPage() {
               // browser cannot complete the verification request (network interruptions,
               // capture delay, or a navigation during checkout).
               console.error('Payment verification follow-up failed:', error);
-              setPendingOnlineOrder(null);
+              sessionStorage.removeItem(storageKey);
               clearCart(store._id);
-              toast.message('Payment received. We are confirming your order now.');
+              toast.message('Your payment confirmation is still being checked. View your order for its latest status.');
               router.replace(buildOrderSuccessUrl(store.slug, order._id, razorpayData.transactionId));
               resolve();
             }
           },
           prefill: {
             name: `${formData.firstName} ${formData.lastName}`,
-            email: formData.email,
+            email: verifiedUser.email,
             contact: formData.phone,
           },
           theme: {
@@ -333,7 +336,7 @@ export default function CheckoutPage() {
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isAuthenticated) {
+    if (!isAuthenticated || user?.email.toLowerCase() !== formData.email.trim().toLowerCase()) {
       setShowOtpModal(true);
       return;
     }
@@ -348,6 +351,7 @@ export default function CheckoutPage() {
         isOpen={showOtpModal}
         onClose={() => setShowOtpModal(false)}
         onSuccess={() => {
+           setFormData((current) => ({ ...current, email: useAuth.getState().user?.email || current.email }));
            setShowOtpModal(false);
            processOrder();
         }}
@@ -468,7 +472,7 @@ export default function CheckoutPage() {
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input required name="city" placeholder="City" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.city} onChange={handleInputChange} />
-                  <input required name="pincode" placeholder="Pincode" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.pincode} onChange={handleInputChange} />
+                  <input required name="pincode" inputMode="numeric" pattern="[1-9][0-9]{5}" maxLength={6} aria-label="PIN code" placeholder="Pincode" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.pincode} onChange={handleInputChange} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input required name="state" placeholder="State" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.state} onChange={handleInputChange} />
@@ -477,13 +481,14 @@ export default function CheckoutPage() {
 
                 <h2 className="text-2xl font-semibold mt-12 mb-8">What&apos;s your contact information?</h2>
                 <div className="space-y-4">
-                  <input required type="email" name="email" placeholder="Email" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.email} onChange={handleInputChange} />
-                  <input required name="phone" placeholder="Phone Number" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.phone} onChange={handleInputChange} />
+                  <input readOnly={isAuthenticated} aria-label="Email address" required type="email" name="email" placeholder="Email" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.email} onChange={handleInputChange} />
+                  <input required name="phone" type="tel" pattern="(\+91[ -]?)?[6-9][0-9]{9}" aria-label="Mobile number" placeholder="Phone Number" className="w-full p-4 border border-gray-300 dark:border-white/20 rounded-md bg-transparent dark:text-white" value={formData.phone} onChange={handleInputChange} />
                 </div>
 
                 <h2 className="text-2xl font-semibold mt-12 mb-8">Payment Method</h2>
                 <div className="space-y-4">
                    <div
+                     role="radio" aria-checked={paymentMethod === 'razorpay'} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') setPaymentMethod('razorpay'); }}
                      onClick={() => setPaymentMethod('razorpay')}
                      className={`p-6 border-2 rounded-xl cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === 'razorpay' ? 'border-black dark:border-white bg-black/5' : 'border-gray-200 dark:border-white/10'}`}
                    >
@@ -495,7 +500,8 @@ export default function CheckoutPage() {
                      {paymentMethod === 'razorpay' && <div className="w-4 h-4 bg-black dark:bg-white rounded-full" />}
                    </div>
 
-                   <div
+                   {settings.codEnabled && <div
+                     role="radio" aria-checked={paymentMethod === 'cod'} tabIndex={0} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') setPaymentMethod('cod'); }}
                      onClick={() => setPaymentMethod('cod')}
                      className={`p-6 border-2 rounded-xl cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === 'cod' ? 'border-black dark:border-white bg-black/5' : 'border-gray-200 dark:border-white/10'}`}
                    >
@@ -505,11 +511,12 @@ export default function CheckoutPage() {
                         <span className="text-sm text-gray-500">Pay when you receive your order</span>
                      </div>
                      {paymentMethod === 'cod' && <div className="w-4 h-4 bg-black dark:bg-white rounded-full" />}
-                   </div>
+                   </div>}
                 </div>
 
+                <p className="pt-4 text-xs leading-6 text-gray-500">By placing your order, you agree to Crabtile&apos;s <Link className="underline" href={`/${store.slug}/terms-and-conditions`}>terms</Link> and acknowledge the <Link className="underline" href={`/${store.slug}/privacy-policy`}>privacy policy</Link>. Read our <Link className="underline" href={`/${store.slug}/returns-refunds`}>return policy</Link>.</p>
                 <Button disabled={loading} type="submit" className="w-full py-8 mt-12 rounded-full text-lg font-bold">
-                  {loading ? 'Processing...' : `Continue to Pay ₹ ${total.toLocaleString('en-IN')}`}
+                  {loading ? 'Processing...' : `${paymentMethod === 'cod' ? 'Place order' : 'Continue to payment'} · ₹${total.toLocaleString('en-IN')}`}
                 </Button>
               </form>
             </section>
@@ -537,7 +544,7 @@ export default function CheckoutPage() {
 
               <div className="space-y-4">
                 <h3 className="font-bold">Delivery estimate</h3>
-                <p className="text-sm text-gray-500">The confirmed delivery timeline will be included with your order update.</p>
+                <p className="text-sm text-gray-500">Dispatch within {settings.processingDays} business days. Estimated delivery {settings.deliveryMinDays}–{settings.deliveryMaxDays} business days after dispatch, depending on your PIN code.</p>
                 <div className="space-y-4 max-h-[400px] overflow-y-auto">
                   {storeItems.map((item) => (
                     <div key={`${item.productId}-${item.variantId}`} className="flex gap-4">

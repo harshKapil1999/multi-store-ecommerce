@@ -11,15 +11,16 @@ interface HeroCarouselProps {
 }
 
 export function HeroCarousel({ billboards, storeSlug }: HeroCarouselProps) {
+  const [paused, setPaused] = useState(false);
   const [current, setCurrent] = useState(0);
 
   useEffect(() => {
-    if (billboards.length <= 1) return;
+    if (billboards.length <= 1 || paused || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const interval = setInterval(() => {
       setCurrent((prev) => (prev + 1) % billboards.length);
-    }, 4000);
+    }, 6500);
     return () => clearInterval(interval);
-  }, [billboards.length]);
+  }, [billboards.length, paused]);
 
   const prevSlide = () => {
     setCurrent((prev) => (prev === 0 ? billboards.length - 1 : prev - 1));
@@ -31,22 +32,20 @@ export function HeroCarousel({ billboards, storeSlug }: HeroCarouselProps) {
 
   // Helper function to build CTA link with store slug prepended
   const buildCtaLink = (ctaLink?: string): string => {
-    if (!ctaLink) return '#';
-    // If it already starts with /, prepend store slug
-    if (ctaLink.startsWith('/')) {
-      return storeSlug ? `/${storeSlug}${ctaLink}` : ctaLink;
-    }
-    // If it's a full URL, use as-is
-    return ctaLink;
+    const fallback = storeSlug ? `/${storeSlug}/products` : '/';
+    if (!ctaLink || /[\\\s]/.test(ctaLink) || ctaLink.startsWith('//')) return fallback;
+    if (ctaLink.startsWith('/')) return storeSlug && !ctaLink.startsWith(`/${storeSlug}/`) && ctaLink !== `/${storeSlug}` ? `/${storeSlug}${ctaLink}` : ctaLink;
+    return /^https:\/\//i.test(ctaLink) ? ctaLink : fallback;
   };
 
   if (!billboards || billboards.length === 0) return null;
 
   return (
-    <div className="relative h-[85vh] w-full overflow-hidden bg-black">
+    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocusCapture={() => setPaused(true)} className="relative h-[65svh] min-h-[420px] max-h-[780px] w-full overflow-hidden bg-black">
       {/* Slides */}
       {billboards.map((billboard, index) => (
         <div
+          aria-hidden={index !== current} inert={index !== current}
           key={billboard._id}
           className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
             index === current ? 'opacity-100 z-10' : 'opacity-0 z-0'
@@ -55,6 +54,7 @@ export function HeroCarousel({ billboards, storeSlug }: HeroCarouselProps) {
           {/* Background Image */}
           <div className="absolute inset-0">
              <img 
+               loading={index === 0 ? "eager" : "lazy"} fetchPriority={index === 0 ? "high" : "auto"}
                src={billboard.imageUrl} 
                alt={billboard.title}
                className="w-full h-full object-cover"
@@ -73,9 +73,9 @@ export function HeroCarousel({ billboards, storeSlug }: HeroCarouselProps) {
                      {billboard.subtitle}
                    </div>
                 )}
-                <h1 className="text-5xl md:text-8xl font-black mb-6 tracking-tight uppercase leading-[0.9]">
+                <h2 className="text-4xl sm:text-5xl md:text-7xl font-black mb-6 tracking-tight uppercase leading-[0.9]">
                   {billboard.title}
-                </h1>
+                </h2>
                 {billboard.ctaText && (
                   <Link
                     href={buildCtaLink(billboard.ctaLink)}
@@ -94,22 +94,24 @@ export function HeroCarousel({ billboards, storeSlug }: HeroCarouselProps) {
       {billboards.length > 1 && (
         <>
           <button 
-            onClick={prevSlide}
+            aria-label="Previous slide" onClick={prevSlide}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/10 hover:bg-white/30 rounded-full backdrop-blur-md transition-colors text-white"
           >
             <ChevronLeft size={32} />
           </button>
           <button 
-            onClick={nextSlide}
+            aria-label="Next slide" onClick={nextSlide}
             className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2 bg-white/10 hover:bg-white/30 rounded-full backdrop-blur-md transition-colors text-white"
           >
             <ChevronRight size={32} />
           </button>
 
+          <button aria-label={paused ? "Play slideshow" : "Pause slideshow"} onClick={() => setPaused(!paused)} className="absolute bottom-6 right-5 z-20 rounded-full bg-black/50 px-4 py-2 text-xs text-white">{paused ? "Play" : "Pause"}</button>
           {/* Dots */}
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-3">
             {billboards.map((_, idx) => (
               <button
+                aria-label={`Show slide ${idx + 1}`} aria-pressed={idx === current}
                 key={idx}
                 onClick={() => setCurrent(idx)}
                 className={`w-12 h-1 rounded-full transition-all duration-300 ${

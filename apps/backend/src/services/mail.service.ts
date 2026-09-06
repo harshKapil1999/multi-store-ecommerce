@@ -21,6 +21,7 @@ class MailService {
   private isConfigured = false;
 
   constructor() {
+    if (process.env.NODE_ENV === 'test') return;
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
       console.warn('SMTP not configured. Transactional emails will be logged to console only.');
       return;
@@ -66,7 +67,7 @@ class MailService {
     const store = await Store.findById(orderData.storeId).select('slug').lean();
     if (!store?.slug) return '';
 
-    return `${storefrontUrl}/${store.slug}/order-success?orderId=${encodeURIComponent(String(orderData._id))}&email=${encodeURIComponent(email)}`;
+    return `${storefrontUrl}/${store.slug}/order-success?orderId=${encodeURIComponent(String(orderData._id))}`;
   }
 
   private async send(mailOptions: nodemailer.SendMailOptions, fallbackLabel: string) {

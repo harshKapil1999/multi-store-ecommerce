@@ -1,3 +1,5 @@
+import { validate } from '../middleware/validate';
+import { createPageSchema, pageSectionSchema } from '../validators/page.schema';
 import { Router } from 'express';
 import * as pageController from '../controllers/page.controller';
 import { authenticate } from '../middleware/auth';
@@ -44,14 +46,14 @@ router.get('/:pageId', authenticate, authorize('admin', 'store_owner'), requireS
  * @desc    Create a new page
  * @access  Private (requires authentication)
  */
-router.post('/', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.createPage);
+router.post('/', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, validate(createPageSchema), pageController.createPage);
 
 /**
  * @route   PUT /api/v1/stores/:storeId/pages/:pageId
  * @desc    Update a page
  * @access  Private
  */
-router.put('/:pageId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.updatePage);
+router.put('/:pageId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, validate(createPageSchema.partial()), pageController.updatePage);
 
 /**
  * @route   DELETE /api/v1/stores/:storeId/pages/:pageId
@@ -72,14 +74,14 @@ router.patch('/:pageId/publish', authenticate, authorize('admin', 'store_owner')
  * @desc    Add a section to a page
  * @access  Private
  */
-router.post('/:pageId/sections', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.addSection);
+router.post('/:pageId/sections', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, validate(pageSectionSchema), pageController.addSection);
 
 /**
  * @route   PUT /api/v1/stores/:storeId/pages/:pageId/sections/:sectionId
  * @desc    Update a section
  * @access  Private
  */
-router.put('/:pageId/sections/:sectionId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, pageController.updateSection);
+router.put('/:pageId/sections/:sectionId', authenticate, authorize('admin', 'store_owner'), requireStoreAccess, validate(pageSectionSchema.partial()), pageController.updateSection);
 
 /**
  * @route   DELETE /api/v1/stores/:storeId/pages/:pageId/sections/:sectionId

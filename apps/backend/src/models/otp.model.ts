@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IOtp extends Document {
+    attempts: number;
     email: string;
     otp: string;
     type: 'login' | 'register' | 'order_confirmation';
@@ -9,6 +10,7 @@ export interface IOtp extends Document {
 
 const otpSchema = new Schema<IOtp>(
     {
+        attempts: { type: Number, default: 0 },
         email: {
             type: String,
             required: true,
@@ -28,7 +30,7 @@ const otpSchema = new Schema<IOtp>(
         expiresAt: {
             type: Date,
             required: true,
-            index: { expires: '10m' }, // Automatically delete after 10 minutes
+            index: { expires: 0 }, // Automatically delete after 10 minutes
         },
     },
     {
@@ -37,6 +39,6 @@ const otpSchema = new Schema<IOtp>(
 );
 
 // Compound index for email and type
-otpSchema.index({ email: 1, type: 1 });
+otpSchema.index({ email: 1, type: 1 }, { unique: true });
 
 export const Otp = mongoose.model<IOtp>('Otp', otpSchema);

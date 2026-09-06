@@ -26,13 +26,13 @@ export function ProductView({ product, variants, categoryName }: ProductViewProp
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-20">
-      <ImageGallery 
-        featuredImage={activeFeaturedImage} 
-        mediaGallery={activeMediaGallery} 
+      <ImageGallery productName={product.name}
+        featuredImage={activeFeaturedImage}
+        mediaGallery={activeMediaGallery}
       />
-      <ProductInfo 
-        product={product} 
-        variants={variants} 
+      <ProductInfo
+        product={product}
+        variants={variants}
         categoryName={categoryName}
         selectedVariant={selectedVariant}
         onVariantSelect={setSelectedVariant}

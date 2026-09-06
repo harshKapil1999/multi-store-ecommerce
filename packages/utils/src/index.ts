@@ -150,3 +150,12 @@ export function createQueryString(params: Record<string, any>): string {
 export function generateOtp(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
+
+/** Resolve merchant links without accepting script URLs or duplicating a store prefix. */
+export function storeHref(value: string | undefined, slug: string): string {
+  const fallback = `/${slug}/products`;
+  if (!value || /[\\\s]/.test(value) || value.startsWith('//')) return fallback;
+  if (/^https:\/\//i.test(value) || /^(mailto:|tel:)/i.test(value)) return value;
+  if (!value.startsWith('/')) return fallback;
+  return value === `/${slug}` || value.startsWith(`/${slug}/`) ? value : `/${slug}${value}`;
+}

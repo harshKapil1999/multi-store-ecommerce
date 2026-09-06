@@ -5,10 +5,11 @@ import { Media } from '@repo/types';
 
 interface ImageGalleryProps {
   featuredImage: string;
+  productName: string;
   mediaGallery: Media[];
 }
 
-export function ImageGallery({ featuredImage, mediaGallery }: ImageGalleryProps) {
+export function ImageGallery({ featuredImage, mediaGallery, productName }: ImageGalleryProps) {
   // Combine featured + gallery, remove duplicates based on URL
   const allImages = [
     { url: featuredImage, type: 'image' },
@@ -34,6 +35,7 @@ export function ImageGallery({ featuredImage, mediaGallery }: ImageGalleryProps)
        <div className="flex md:flex-col gap-4 overflow-x-auto md:overflow-y-auto md:w-20 md:h-[600px] scrollbar-hide">
           {images.map((img, idx) => (
              <button
+               aria-label={`View ${productName} image ${idx + 1}`}
                key={idx}
                onClick={() => setActiveImage(img)}
                onMouseEnter={() => setActiveImage(img)}
@@ -64,7 +66,7 @@ export function ImageGallery({ featuredImage, mediaGallery }: ImageGalleryProps)
           ) : (
             <img
               src={activeImage.url}
-              alt="Product View"
+              alt={productName}
               className="w-full h-full object-cover object-center"
             />
           )}

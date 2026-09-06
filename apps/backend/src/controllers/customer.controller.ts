@@ -56,7 +56,7 @@ export const getStoreCustomers = async (
           totalSpent: {
             $sum: {
               $cond: [
-                { $not: [{ $in: ['$status', ['cancelled', 'refunded']] }] },
+                { $and: [{ $eq: ['$paymentStatus', 'paid'] }, { $not: [{ $in: ['$status', ['cancelled', 'refunded']] }] }] },
                 '$total',
                 0,
               ],
@@ -159,7 +159,7 @@ export const getStoreCustomerByEmail = async (
     }
 
     const completedOrders = orders.filter(
-      (order) => order.status !== 'cancelled' && order.status !== 'refunded'
+      (order) => order.paymentStatus === 'paid' && order.status !== 'cancelled' && order.status !== 'refunded'
     );
 
     res.json({

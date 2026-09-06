@@ -3,6 +3,7 @@ import type { User as UserType } from '@repo/types';
 
 export interface IUser extends Omit<UserType, '_id'>, Document {
   password: string;
+  emailVerified: boolean;
 }
 
 const userSchema = new Schema<IUser>(
@@ -14,6 +15,7 @@ const userSchema = new Schema<IUser>(
       lowercase: true,
       trim: true,
     },
+    emailVerified: { type: Boolean, default: false },
     password: {
       type: String,
       required: true,

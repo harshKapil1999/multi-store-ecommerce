@@ -10,9 +10,10 @@ const router: Router = Router();
 router.post(
   '/register',
   [
-    body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 6 }),
-    body('name').notEmpty().trim(),
+    body('email').isEmail().trim().toLowerCase(),
+    body('password').isString().isLength({ min: 12, max: 128 }),
+    body('otp').isString().matches(/^\d{6}$/),
+    body('name').isString().trim().isLength({ min: 1, max: 120 }),
   ],
   authRateLimit,
   userController.register
@@ -20,13 +21,13 @@ router.post(
 
 router.post(
   '/login',
-  [body('email').isEmail().normalizeEmail(), body('password').notEmpty()],
+  [body('email').isEmail().trim().toLowerCase(), body('password').notEmpty()],
   authRateLimit,
   userController.login
 );
 
-router.post('/send-otp', authRateLimit, userController.sendOtp);
-router.post('/verify-otp', authRateLimit, userController.verifyOtp);
+router.post('/send-otp', authRateLimit, [body('email').isString().trim().isEmail().isLength({ max: 254 }).toLowerCase()], userController.sendOtp);
+router.post('/verify-otp', authRateLimit, [body('email').isString().trim().isEmail().isLength({ max: 254 }).toLowerCase(), body('otp').isString().matches(/^\d{6}$/), body('name').optional().isString().trim().isLength({ min: 1, max: 120 })], userController.verifyOtp);
 
 // Protected routes
 router.get('/me', authenticate, userController.getCurrentUser);
@@ -36,7 +37,7 @@ router.put(
   authenticate,
   [
     body('name').optional().trim(),
-    body('email').optional().isEmail().normalizeEmail(),
+    body('email').optional().isEmail().trim().toLowerCase(),
   ],
   userController.updateProfile
 );
@@ -46,7 +47,7 @@ router.put(
   authenticate,
   [
     body('currentPassword').notEmpty(),
-    body('newPassword').isLength({ min: 6 }),
+    body('newPassword').isString().isLength({ min: 12, max: 128 }),
   ],
   userController.changePassword
 );

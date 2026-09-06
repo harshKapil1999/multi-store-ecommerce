@@ -1,3 +1,4 @@
+import { canReadDrafts } from '../middleware/store-context';
 import { Response, NextFunction } from 'express';
 import { Billboard } from '../models/billboard.model';
 import { AppError } from '../middleware/error-handler';
@@ -18,8 +19,8 @@ export const listBillboards = async (req: AuthRequest, res: Response, next: Next
     const [billboards, total] = await Promise.all([
       Billboard.find(filter)
         .sort({ order: 1 })
-        .limit(Number(limit))
-        .skip((Number(page) - 1) * Number(limit)),
+        .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 20))))
+        .skip((Math.max(1, Math.floor(Number(page) || 1)) - 1) * Math.min(100, Math.max(1, Math.floor(Number(limit) || 20)))),
       Billboard.countDocuments(filter),
     ]);
 
@@ -42,7 +43,7 @@ export const getBillboardById = async (req: AuthRequest, res: Response, next: Ne
   try {
     const { id } = req.params;
     const { storeId } = req.params;
-    const billboard = await Billboard.findOne({ _id: id, storeId });
+    const billboard = await Billboard.findOne({ _id: id, storeId, ...(!canReadDrafts(req) ? { isActive: true } : {}) });
 
     if (!billboard) {
       throw new AppError('Billboard not found', 404);

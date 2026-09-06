@@ -1,3 +1,6 @@
+import mongoose from 'mongoose';
+import { z } from 'zod';
+import { changeInventory } from '../services/inventory.service';
 import { Request, Response, NextFunction } from 'express';
 import { PaymentService } from '../services/payment.service';
 import { Transaction } from '../models/transaction.model';
@@ -12,15 +15,6 @@ import { Store } from '../models/store.model';
 type WebhookRequest = Request & {
     rawBody?: string;
 };
-
-const normalizeNotes = (notes: Record<string, unknown> | undefined, order: InstanceType<typeof Order>) => ({
-    orderId: String(order._id),
-    orderNumber: order.orderNumber,
-    storeId: order.storeId,
-    ...Object.fromEntries(
-        Object.entries(notes || {}).map(([key, value]) => [key, String(value)])
-    ),
-});
 
 const signaturesMatch = (received: string | undefined, expected: string) => {
     if (!received) return false;
@@ -37,57 +31,25 @@ export const createRazorpayOrder = async (
     next: NextFunction
 ) => {
     try {
-        const { currency, orderId, storeId, notes } = req.body;
-
-        if (!orderId || !storeId) {
-            throw new AppError('Order and store are required to start payment', 400);
-        }
-
-        const order = await Order.findOne({ _id: orderId, storeId });
-        if (!order) {
-            throw new AppError('Order not found', 404);
-        }
-
-        if (order.paymentStatus === 'paid') {
-            throw new AppError('Order has already been paid', 409);
-        }
-
-        const existingTransaction = await Transaction.findOne({
-            orderId,
-            storeId,
-            status: { $in: ['created', 'authorized'] },
-        }).sort({ createdAt: -1 });
-
+        const { orderId, storeId } = z.object({ orderId: z.string().regex(/^[a-f0-9]{24}$/i), storeId: z.string().regex(/^[a-f0-9]{24}$/i) }).parse(req.body);
+        const order = await Order.findOne({ _id: orderId, storeId, 'customer.userId': (req as AuthRequest).user!.id });
+        if (!order) throw new AppError('Order not found', 404);
+        if (order.paymentMethod !== 'razorpay' || ['paid', 'refunded'].includes(order.paymentStatus) || ['cancelled', 'refunded'].includes(order.status)) throw new AppError('This order cannot accept an online payment.', 409);
+        const existingTransaction = await Transaction.findOne({ orderId, storeId }).sort({ createdAt: -1 });
         if (existingTransaction) {
-            return res.status(200).json({
-                success: true,
-                data: {
-                    razorpayOrderId: existingTransaction.razorpayOrderId,
-                    amount: Math.round(order.total * 100),
-                    currency: existingTransaction.currency,
-                    transactionId: existingTransaction._id,
-                    keyId: process.env.RAZORPAY_KEY_ID,
-                },
-            });
+            return res.json({ success: true, data: { razorpayOrderId: existingTransaction.razorpayOrderId, amount: Math.round(existingTransaction.amount * 100), currency: existingTransaction.currency, transactionId: existingTransaction._id, keyId: process.env.RAZORPAY_KEY_ID } });
         }
-
-        const razorpayOrder = await PaymentService.createOrder({
-            amount: order.total,
-            currency: currency || 'INR',
-            receipt: order.orderNumber,
-            notes: normalizeNotes(notes, order),
-        });
-
-        // Create transaction record
-        const transaction = await Transaction.create({
-            orderId,
-            storeId,
-            razorpayOrderId: razorpayOrder.id,
-            amount: order.total,
-            currency: currency || 'INR',
-            status: 'created',
-            notes: normalizeNotes(notes, order),
-        });
+        const claimed = await Order.findOneAndUpdate({ _id: orderId, $or: [{ paymentCreationStartedAt: { $exists: false } }, { paymentCreationStartedAt: { $lt: new Date(Date.now() - 120_000) } }] }, { $set: { paymentCreationStartedAt: new Date() } });
+        if (!claimed) throw new AppError('Payment is being prepared. Please retry shortly.', 409);
+        let razorpayOrder;
+        let transaction;
+        try {
+            const notes = { orderId, storeId, orderNumber: order.orderNumber };
+            razorpayOrder = await PaymentService.createOrder({ amount: order.total, currency: 'INR', receipt: order.orderNumber, notes });
+            transaction = await Transaction.create({ orderId, storeId, razorpayOrderId: razorpayOrder.id, amount: order.total, currency: 'INR', status: 'created', notes });
+        } finally {
+            await Order.updateOne({ _id: orderId }, { $unset: { paymentCreationStartedAt: 1 } });
+        }
 
         res.status(201).json({
             success: true,
@@ -110,7 +72,7 @@ export const verifyPayment = async (
     next: NextFunction
 ) => {
     try {
-        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+        const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = z.object({ razorpayOrderId: z.string().regex(/^order_[a-zA-Z0-9]+$/), razorpayPaymentId: z.string().regex(/^pay_[a-zA-Z0-9]+$/), razorpaySignature: z.string().regex(/^[a-f0-9]{64}$/i) }).parse(req.body);
 
         if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
             throw new AppError('Missing payment verification parameters', 400);
@@ -132,6 +94,8 @@ export const verifyPayment = async (
             throw new AppError('Transaction not found', 404);
         }
 
+        if (!(await Order.exists({ _id: transaction.orderId, 'customer.userId': (req as AuthRequest).user!.id }))) throw new AppError('Order not found', 404);
+
         // Fetch payment details from Razorpay
         let paymentDetails;
         try {
@@ -148,14 +112,17 @@ export const verifyPayment = async (
             throw new AppError('Payment amount does not match the transaction amount', 400);
         }
 
+        if (paymentDetails.currency !== transaction.currency) throw new AppError('Payment currency mismatch', 400);
         if (paymentDetails.status !== 'captured' && paymentDetails.captured !== true) {
+            if (transaction.status === 'captured' || transaction.status === 'refunded') return res.json({ success: true, data: { orderId: transaction.orderId, state: 'already_fulfilled' } });
+            if (paymentDetails.status !== 'authorized') throw new AppError('Payment has not succeeded. You can retry checkout.', 409);
             transaction.status = 'authorized';
             transaction.razorpayPaymentId = razorpayPaymentId;
             transaction.razorpaySignature = razorpaySignature;
             transaction.method = paymentDetails.method;
             transaction.email = paymentDetails.email;
             transaction.phone = String(paymentDetails.contact || '');
-            await transaction.save();
+            await Transaction.updateOne({ _id: transaction._id, status: { $nin: ['captured', 'refunded'] } }, { $set: { status: 'authorized', razorpayPaymentId, method: paymentDetails.method } });
 
             return res.status(202).json({
                 success: true,
@@ -174,10 +141,10 @@ export const verifyPayment = async (
             razorpaySignature,
             method: paymentDetails.method,
             email: paymentDetails.email,
-            phone: String(paymentDetails.contact || ''),
+            phone: String(paymentDetails.contact || ''), amount: Number(paymentDetails.amount), currency: paymentDetails.currency,
         });
 
-        if (fulfillment.state === 'fulfilled' && fulfillment.order) {
+        if (['fulfilled', 'manual_review'].includes(fulfillment.state) && fulfillment.order) {
             try {
                 await mailService.sendOrderConfirmation(fulfillment.order.customer.email, fulfillment.order);
             } catch (error) {
@@ -244,6 +211,8 @@ export const handleWebhook = async (
                 await handlePaymentFailed(payload.payment.entity);
                 break;
             case 'refund.created':
+            case 'refund.processed':
+            case 'refund.failed':
                 await handleRefundCreated(payload.refund.entity);
                 break;
             default:
@@ -256,80 +225,42 @@ export const handleWebhook = async (
     }
 };
 
-export const refundPayment = async (
-    req: AuthRequest,
-    res: Response,
-    next: NextFunction
-) => {
+export const refundPayment = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
-        const { transactionId, amount } = req.body;
-
-        const transaction = await Transaction.findById(transactionId);
-        if (!transaction) {
-            throw new AppError('Transaction not found', 404);
+        const transaction = await Transaction.findById(req.body.transactionId);
+        if (!transaction) throw new AppError('Transaction not found', 404);
+        if (req.user!.role !== 'admin' && !(await Store.exists({ _id: transaction.storeId, owner: req.user!.id }))) throw new AppError('Not authorized', 403);
+        if (req.body.amount !== undefined && req.body.amount !== transaction.amount) throw new AppError('Only full refunds are supported here. Reconcile partial refunds through Razorpay.', 400);
+        if (transaction.status !== 'captured' || !transaction.razorpayPaymentId) throw new AppError('Only captured payments can be refunded.', 409);
+        const claim = await Transaction.findOneAndUpdate({ _id: transaction._id, refundPending: { $ne: true }, status: 'captured' }, { $set: { refundPending: true } });
+        if (!claim) throw new AppError('Refund already requested. Check Razorpay before retrying.', 409);
+        // Keep the claim on an ambiguous network failure: a retry could otherwise refund twice.
+        let refund;
+        try { refund = await PaymentService.createRefund(transaction.razorpayPaymentId, transaction.amount); }
+        catch (error) {
+            // A definitive provider rejection created no refund. Keep ambiguous failures locked for reconciliation.
+            if (error instanceof AppError && error.statusCode === 400) await Transaction.updateOne({_id: transaction._id}, {$set:{refundPending:false, refundError:error.message}});
+            throw error;
         }
-
-        if (req.user!.role === 'store_owner') {
-            const ownsStore = await Store.exists({ _id: transaction.storeId, owner: req.user!.id });
-            if (!ownsStore) throw new AppError('Not authorized to refund this transaction', 403);
-        }
-
-        if (transaction.status !== 'captured') {
-            throw new AppError('Only captured transactions can be refunded', 400);
-        }
-
-        if (!transaction.razorpayPaymentId) {
-            throw new AppError('No payment to refund', 400);
-        }
-
-        // Create refund
-        const refund = await PaymentService.createRefund(
-            transaction.razorpayPaymentId,
-            amount
-        );
-
-        transaction.status = 'refunded';
-        await transaction.save();
-
-        // Update order
-        const order = await Order.findById(transaction.orderId);
-        if (order) {
-            const previousStatus = order.status;
-            order.paymentStatus = 'refunded';
-            order.status = 'refunded';
-            order.statusHistory = [
-                ...(order.statusHistory || []),
-                { status: 'refunded', at: new Date(), note: 'Payment refunded by the store.' },
-            ];
-            await order.save();
-            try {
-                await mailService.sendOrderStatusUpdate(order.customer.email, order, previousStatus);
-            } catch (mailError) {
-                console.error('Error sending refund email:', mailError);
-            }
-        }
-
-        res.json({
-            success: true,
-            message: 'Refund initiated successfully',
-            data: refund,
-        });
-    } catch (error) {
-        next(error);
-    }
+        await Transaction.updateOne({_id: transaction._id}, {$unset:{refundError:1}});
+        await Transaction.updateOne({ _id: transaction._id }, { $set: { refundId: refund.id } });
+        await handleRefundCreated(refund);
+        res.json({ success: true, message: 'Refund requested. Status updates after Razorpay confirms processing.', data: refund });
+    } catch (error) { next(error); }
 };
 
 // Helper functions for webhook event handlers
 async function handlePaymentCaptured(payment: any) {
+    if (!(await Transaction.exists({ razorpayOrderId: payment.order_id }))) return;
     const fulfillment = await finalizeCapturedPayment({
         razorpayOrderId: payment.order_id,
         razorpayPaymentId: payment.id,
         method: payment.method,
         email: payment.email,
-        phone: String(payment.contact || ''),
+        phone: String(payment.contact || ''), amount: Number(payment.amount), currency: payment.currency,
     });
 
-    if (fulfillment.state === 'fulfilled' && fulfillment.order) {
+    if (['fulfilled', 'manual_review'].includes(fulfillment.state) && fulfillment.order) {
         try {
             await mailService.sendOrderConfirmation(fulfillment.order.customer.email, fulfillment.order);
         } catch (error) {
@@ -339,38 +270,41 @@ async function handlePaymentCaptured(payment: any) {
 }
 
 async function handlePaymentFailed(payment: any) {
-    const transaction = await Transaction.findOne({
-        razorpayOrderId: payment.order_id,
-    });
-
-    if (transaction) {
-        transaction.status = 'failed';
-        transaction.errorCode = payment.error_code;
-        transaction.errorDescription = payment.error_description;
-        await transaction.save();
-
-        const order = await Order.findById(transaction.orderId);
-        if (order) {
-            order.paymentStatus = 'failed';
-            await order.save();
-        }
-    }
+    const session = await mongoose.startSession();
+    try {
+        await session.withTransaction(async () => {
+            const transaction = await Transaction.findOneAndUpdate({ razorpayOrderId: payment.order_id, status: { $in: ['created', 'failed'] } }, { $set: { status: 'failed', errorCode: payment.error_code, errorDescription: payment.error_description } }, { new: true, session });
+            if (transaction) await Order.updateOne({ _id: transaction.orderId, paymentStatus: { $in: ['pending', 'failed'] } }, { $set: { paymentStatus: 'failed' } }, { session });
+        });
+    } finally { await session.endSession(); }
 }
 
 async function handleRefundCreated(refund: any) {
-    const transaction = await Transaction.findOne({
-        razorpayPaymentId: refund.payment_id,
-    });
-
-    if (transaction) {
-        transaction.status = 'refunded';
-        await transaction.save();
-
-        const order = await Order.findById(transaction.orderId);
-        if (order) {
-            order.paymentStatus = 'refunded';
-            order.status = 'refunded';
-            await order.save();
-        }
+    const transaction = await Transaction.findOne({ razorpayPaymentId: refund.payment_id });
+    if (!transaction || transaction.status === 'refunded') return;
+    // Provider lookup reconciles the total across partial refunds and out-of-order events.
+    const payment = await PaymentService.fetchPayment(refund.payment_id);
+    const fullRefund = payment.refund_status === 'full' && Number(payment.amount_refunded) >= Math.round(transaction.amount * 100);
+    if (!fullRefund) {
+        await Transaction.updateOne({ _id: transaction._id }, { $set: { refundPending: !['failed', 'processed'].includes(refund.status), refundId: refund.id } });
+        return;
+    }
+    const session = await mongoose.startSession();
+    let updatedOrder: InstanceType<typeof Order> | null = null;
+    try {
+        await session.withTransaction(async () => {
+            updatedOrder = null;
+            const changed = await Transaction.updateOne({ _id: transaction._id, status: { $ne: 'refunded' } }, { $set: { status: 'refunded', refundPending: false, refundId: refund.id } }, { session });
+            if (!changed.modifiedCount) return;
+            const currentOrder = await Order.findById(transaction.orderId).session(session);
+            if (!currentOrder) throw new AppError('Order not found', 404);
+            const release = currentOrder.inventoryStatus === 'committed' && ['pending', 'confirmed', 'processing'].includes(currentOrder.status);
+            if (release) await changeInventory(currentOrder.items, currentOrder.storeId, 1, session);
+            updatedOrder = await Order.findByIdAndUpdate(transaction.orderId, { $set: { status: 'refunded', paymentStatus: 'refunded', ...(release ? {inventoryStatus: 'released'} : {}) }, $push: { statusHistory: { status: 'refunded', at: new Date(), note: 'Razorpay confirmed the full refund.' } } }, { session, new: true });
+        });
+    } finally { await session.endSession(); }
+    if (updatedOrder) {
+        const order = updatedOrder as InstanceType<typeof Order>;
+        try { await mailService.sendOrderStatusUpdate(order.customer.email, order, 'cancelled'); } catch { console.error('Refund notification failed', { orderId: String(order._id) }); }
     }
 }

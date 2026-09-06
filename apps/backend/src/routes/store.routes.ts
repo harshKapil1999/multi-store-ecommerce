@@ -11,6 +11,7 @@ router.get('/', validate(listStoresQuerySchema, 'query'), storeController.getAll
 router.get('/slug/:slug', storeController.getStoreBySlug);
 router.get('/admin', authenticate, authorize('admin', 'store_owner'), validate(listStoresQuerySchema, 'query'), storeController.getAdminStores);
 router.get('/admin/:id', authenticate, authorize('admin', 'store_owner'), storeController.getAdminStoreById);
+router.get('/:id/stats', authenticate, authorize('admin', 'store_owner'), storeController.getStoreStats);
 router.get('/:id', storeController.getStoreById);
 
 // Protected routes (admin/store_owner only)

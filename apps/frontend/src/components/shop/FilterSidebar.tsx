@@ -1,6 +1,7 @@
 "use client";
 
 import { CategoryWithChildren, Attribute } from '@repo/types';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { JSX, useState } from 'react';
@@ -20,6 +21,7 @@ export function FilterSidebar({
   filterableAttributes = [],
   onFilterChange
 }: FilterSidebarProps) {
+  const router = useRouter(), pathname = usePathname(), searchParams = useSearchParams();
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     categories: true,
     price: true,
@@ -28,7 +30,7 @@ export function FilterSidebar({
   
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const selectedCount = Object.values(selectedFilters).reduce((count, values) => count + values.length, 0);
+  const selectedCount = Object.values(selectedFilters).reduce((count, values) => count + values.length, 0) + (searchParams.has('minPrice') || searchParams.has('maxPrice') ? 1 : 0);
 
   const toggleSection = (section: string) => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -49,6 +51,7 @@ export function FilterSidebar({
 
   const clearFilters = () => {
     setSelectedFilters({});
+    const query = new URLSearchParams(searchParams.toString()); query.delete('minPrice'); query.delete('maxPrice'); query.delete('page'); router.push(`${pathname}?${query}`);
     onFilterChange?.({});
   };
 
@@ -236,8 +239,8 @@ export function FilterSidebar({
                    <label key={idx} className="group flex cursor-pointer items-center gap-3">
                       <input
                         type="checkbox"
-                        checked={(selectedFilters.price || []).includes(`${range.min}-${range.max ?? 'plus'}`)}
-                        onChange={() => toggleFilter('price', `${range.min}-${range.max ?? 'plus'}`)}
+                        checked={searchParams.get('minPrice') === String(range.min) && searchParams.get('maxPrice') === (range.max === null ? null : String(range.max))}
+                        onChange={event => { const query = new URLSearchParams(searchParams.toString()); query.delete('page'); if (!event.target.checked) { query.delete('minPrice'); query.delete('maxPrice'); } else { query.set('minPrice', String(range.min)); if (range.max !== null) query.set('maxPrice', String(range.max)); else query.delete('maxPrice'); } router.push(`${pathname}?${query}`); }}
                         className="h-6 w-6 rounded-md border-gray-400 text-black focus:ring-black dark:border-white/40 dark:bg-transparent dark:text-white"
                       />
                       <span className="text-base text-gray-700 transition-colors group-hover:text-black dark:text-gray-300 dark:group-hover:text-white">

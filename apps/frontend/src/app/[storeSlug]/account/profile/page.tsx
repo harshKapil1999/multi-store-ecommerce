@@ -3,25 +3,27 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { User } from '@repo/types';
+import { useStore } from '@/lib/store-context';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth-store';
 import { Button } from '@/components/ui/Button';
 
 export default function ProfilePage() {
+  const { store } = useStore();
   const { setAuth, token } = useAuth();
   const [profile, setProfile] = useState<User | null>(null);
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    api.get<User>('/auth/me').then((data) => { setProfile(data); setName(data.name); }).catch((error) => toast.error(error.message));
+    api.get<User>('/users/me').then((data) => { setProfile(data); setName(data.name); }).catch((error) => toast.error(error.message));
   }, []);
 
   const save = async () => {
     if (!profile || !token) return;
     setSaving(true);
     try {
-      const updated = await api.put<User>('/auth/profile', { name });
+      const updated = await api.put<User>('/users/profile', { name });
       setProfile(updated);
       setAuth(updated, token);
       toast.success('Profile updated');
@@ -36,6 +38,7 @@ export default function ProfilePage() {
     <div className="max-w-2xl">
       <h2 className="text-2xl font-bold">Personal details</h2>
       <p className="mt-2 text-gray-500 dark:text-gray-400">Your verified email connects purchases and delivery updates to this account.</p>
+      <div className="mt-6"><Button variant="outline" onClick={async () => { try { await api.delete(`/stores/${store?._id}/newsletter`); toast.success('Unsubscribed from marketing emails'); } catch { toast.error('Could not unsubscribe. Please contact support.'); } }}>Unsubscribe from marketing emails</Button><p className="mt-2 text-sm text-gray-500">Order and account security messages will continue.</p></div>
       <div className="mt-8 space-y-5 border border-gray-200 p-6 dark:border-white/10">
         <label className="block text-sm font-semibold">Name
           <input value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full border border-gray-300 bg-transparent px-4 py-3 outline-none focus:border-black dark:border-white/20 dark:focus:border-white" />

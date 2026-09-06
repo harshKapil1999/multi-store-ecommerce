@@ -1,83 +1,11 @@
-"use client";
-
+'use client';
 import Link from 'next/link';
 import { useStore } from '@/lib/store-context';
-import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { CategoryWithChildren, Page } from '@repo/types';
-
+import { DEFAULT_COMMERCE_SETTINGS } from '@repo/types';
+import { POLICY_TITLES } from '@/lib/policies';
 export function Footer() {
-  const { store } = useStore();
-  const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
-  const [pages, setPages] = useState<Page[]>([]);
-
-  useEffect(() => {
-    if (store?._id) {
-      Promise.all([
-        api.get<CategoryWithChildren[]>(`/stores/${store._id}/categories/tree`),
-        api.get<Page[]>(`/stores/${store._id}/pages?published=true`),
-      ])
-        .then(([categoryData, pageData]) => {
-          if (Array.isArray(categoryData)) setCategories(categoryData);
-          if (Array.isArray(pageData)) setPages(pageData.filter((page) => !page.isHomePage));
-        })
-        .catch(err => console.error(err));
-    }
-  }, [store?._id]);
-
+  const { store, categories } = useStore();
   if (!store) return null;
-
-  // Filter only top-level categories
-  const topLevelCategories = categories.filter(cat => !cat.parentId);
-
-  const configuredSections = store.footer?.sections?.filter((section) => section.links?.length) || [];
-  const footerSections = configuredSections.length > 0 ? configuredSections : [
-    {
-      title: 'Shop',
-      links: topLevelCategories.map(cat => ({
-        label: cat.name,
-        href: `/${store.slug}/category/${cat.slug}`
-      }))
-    },
-    {
-      title: 'Information',
-      links: pages.map((page) => ({ label: page.title, href: `/${store.slug}/${page.slug}` })),
-    }
-  ].filter((section) => section.links.length > 0);
-
-  return (
-    <footer className="bg-black text-white pt-16 pb-8 border-t border-white/10">
-      <div className="container mx-auto px-4 md:px-8">
-        {/* Top Sections */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
-          {footerSections.map((section, idx) => (
-            <div key={idx}>
-              <h3 className="font-bold text-sm uppercase tracking-wider mb-4 text-white">
-                {section.title}
-              </h3>
-              <ul className="space-y-3">
-                {section.links.map((link, lIdx) => (
-                  <li key={lIdx}>
-                    <Link 
-                      href={link.href}
-                      className="text-xs text-gray-400 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-white/10">
-          <div className="mb-4 md:mb-0 text-xs text-gray-500">
-             &copy; {new Date().getFullYear()} {store.name}. All Rights Reserved
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
+  const settings = { ...DEFAULT_COMMERCE_SETTINGS, ...store.commerce };
+  return <footer className="bg-[#142523] px-5 pb-8 pt-14 text-white md:px-8"><div className="mx-auto max-w-7xl"><div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4"><div><Link href="/" className="text-2xl font-bold tracking-tight">crabtile.</Link><p className="mt-4 text-sm leading-6 text-white/60">{settings.businessAddress}</p><a className="mt-4 block text-sm underline underline-offset-4" href={`mailto:${settings.supportEmail}`}>{settings.supportEmail}</a>{settings.supportPhone && <a href={`tel:${settings.supportPhone}`} className="mt-2 block text-sm">{settings.supportPhone}</a>}</div><div><h2 className="mb-5 text-sm font-semibold">Explore</h2><ul className="space-y-3 text-sm text-white/60"><li><Link href={`/${store.slug}/products`}>All products</Link></li>{categories.filter(c=>!c.parentId).map(c=><li key={c._id}><Link href={`/${store.slug}/category/${c.slug}`}>{c.name}</Link></li>)}<li><Link href="/">All collections</Link></li></ul></div><div><h2 className="mb-5 text-sm font-semibold">Customer care</h2><ul className="space-y-3 text-sm text-white/60"><li><Link href={`/${store.slug}/account/orders`}>Track your order</Link></li><li><Link href={`/${store.slug}/account`}>Your account</Link></li>{Object.entries(POLICY_TITLES).filter(([key])=>['contact','shipping-policy','returns-refunds'].includes(key)).map(([key,title])=><li key={key}><Link href={`/${store.slug}/${key}`}>{title}</Link></li>)}</ul></div><div><h2 className="mb-5 text-sm font-semibold">About Crabtile</h2><ul className="space-y-3 text-sm text-white/60">{Object.entries(POLICY_TITLES).filter(([key])=>['about-us','privacy-policy','terms-and-conditions'].includes(key)).map(([key,title])=><li key={key}><Link href={`/${store.slug}/${key}`}>{title}</Link></li>)}</ul></div></div><div className="mt-12 flex flex-wrap justify-between gap-4 border-t border-white/15 pt-6 text-xs text-white/50"><span>© {new Date().getFullYear()} {settings.businessName}. All rights reserved.</span><span>India · INR (₹)</span></div></div></footer>;
 }

@@ -32,7 +32,8 @@ export const validateStoreContext = async (
       throw new AppError('Store not found', 404);
     }
 
-    if (!store.isActive) {
+    const user = (req as AuthRequest).user;
+    if (!store.isActive && !(user && (user.role === 'admin' || String(store.owner) === user.id))) {
       throw new AppError('Store is inactive', 403);
     }
 
@@ -68,3 +69,5 @@ export const requireStoreAccess = (
 
   return next(new AppError('Not authorized to manage this store', 403));
 };
+
+export const canReadDrafts = (req: StoreContextRequest & AuthRequest) => Boolean(req.user && (req.user.role === 'admin' || String(req.storeContext?.store.owner) === req.user.id));

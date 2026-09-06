@@ -31,6 +31,8 @@ export interface Store {
   updatedAt: Date;
   homeBillboards?: Billboard[]; // Populated
   homeSections?: HomeSectionConfig[];
+  commerce?: CommerceSettings;
+  seo?: { title?: string; description?: string; image?: string };
 }
 
 export type HomeSectionType =
@@ -57,12 +59,12 @@ export interface HomeSectionConfig {
 }
 
 export const DEFAULT_HOME_SECTIONS: HomeSectionConfig[] = [
-  { id: 'featured-categories', type: 'featured_categories', title: 'Featured', isVisible: true, order: 0, categoryIds: [], limit: 4, layout: 'grid' },
-  { id: 'shop-by-collection', type: 'category_collection', title: 'Shop by Collection', isVisible: true, order: 1, categoryIds: [], limit: 6, layout: 'carousel' },
-  { id: 'spotlight', type: 'spotlight', title: 'Spotlight', isVisible: true, order: 2, productIds: [], limit: 8, layout: 'carousel' },
-  { id: 'featured-products', type: 'featured_products', title: 'Featured Products', isVisible: false, order: 3, productIds: [], limit: 8, layout: 'grid' },
-  { id: 'editorial-spotlight', type: 'editorial_spotlight', title: 'Spotlight', subtitle: 'Discover standout products selected for this store.', isVisible: true, order: 4, productIds: [], limit: 16, layout: 'grid' },
-  { id: 'newsletter', type: 'newsletter', title: 'Join our community', subtitle: 'Sign up for product releases, store news, and member updates.', isVisible: true, order: 5, buttonLabel: 'Join now', consentText: 'You can unsubscribe at any time.' },
+  { id: 'featured-categories', type: 'featured_categories', title: 'Shop by category', isVisible: true, order: 0, categoryIds: [], limit: 4, layout: 'grid' },
+  { id: 'shop-by-collection', type: 'category_collection', title: 'Shop by Collection', isVisible: false, order: 1, categoryIds: [], limit: 6, layout: 'carousel' },
+  { id: 'spotlight', type: 'spotlight', title: 'Spotlight', isVisible: false, order: 2, productIds: [], limit: 8, layout: 'carousel' },
+  { id: 'featured-products', type: 'featured_products', title: 'Featured products', isVisible: true, order: 3, productIds: [], limit: 8, layout: 'grid' },
+  { id: 'editorial-spotlight', type: 'editorial_spotlight', title: 'Spotlight', subtitle: 'Discover standout products selected for this store.', isVisible: false, order: 4, productIds: [], limit: 16, layout: 'grid' },
+  { id: 'newsletter', type: 'newsletter', title: 'Join our community', subtitle: 'Sign up for product releases, store news, and member updates.', isVisible: false, order: 5, buttonLabel: 'Join now', consentText: 'You can unsubscribe at any time.' },
 ];
 
 export interface StoreTheme {
@@ -248,6 +250,10 @@ export interface Order {
   paymentMethod?: string;
   transactionId?: string; // Reference to Transaction
   razorpayOrderId?: string;
+  checkoutKey?: string;
+  checkoutFingerprint?: string;
+  paymentCreationStartedAt?: Date;
+  inventoryStatus?: 'uncommitted' | 'committed' | 'released' | 'review';
   shippingAddress: Address;
   billingAddress: Address;
   fulfillment?: OrderFulfillment;
@@ -367,6 +373,9 @@ export interface Transaction {
   razorpayOrderId: string;
   razorpayPaymentId?: string;
   razorpaySignature?: string;
+  refundPending?: boolean;
+  refundError?: string;
+  refundId?: string;
   amount: number;
   currency: string;
   status: 'created' | 'authorized' | 'captured' | 'failed' | 'refunded';
@@ -425,6 +434,8 @@ export interface CreateStoreRequest {
   topBar?: TopBarConfig;
   homeBillboards?: string[];
   homeSections?: HomeSectionConfig[];
+  commerce?: CommerceSettings;
+  seo?: { title?: string; description?: string; image?: string };
 }
 
 export interface UpdateStoreRequest {
@@ -440,6 +451,8 @@ export interface UpdateStoreRequest {
   topBar?: TopBarConfig;
   homeBillboards?: string[];
   homeSections?: HomeSectionConfig[];
+  commerce?: CommerceSettings;
+  seo?: { title?: string; description?: string; image?: string };
 }
 
 export interface ToggleStoreRequest {
@@ -680,3 +693,39 @@ export interface AddPageSectionInput {
 export interface UpdatePageSectionInput extends Partial<AddPageSectionInput> {
   _id: string;
 }
+
+export interface CommerceSettings {
+  businessName: string;
+  supportEmail: string;
+  supportPhone?: string;
+  grievanceName?: string;
+  grievanceEmail?: string;
+  gstin?: string;
+  businessAddress: string;
+  shippingFee: number;
+  freeShippingThreshold: number;
+  codEnabled: boolean;
+  processingDays: number;
+  deliveryMinDays: number;
+  deliveryMaxDays: number;
+  returnDays: number;
+  refundDays: number;
+}
+
+export const DEFAULT_COMMERCE_SETTINGS: CommerceSettings = {
+  businessName: 'Crabtile', supportEmail: 'support@crabtile.com',
+  businessAddress: 'Himachal Pradesh, India', shippingFee: 99,
+  freeShippingThreshold: 2500, codEnabled: true, processingDays: 2,
+  deliveryMinDays: 3, deliveryMaxDays: 7, returnDays: 7, refundDays: 7,
+};
+
+export function getShipping(subtotal: number, settings?: Partial<CommerceSettings>) {
+  const config = { ...DEFAULT_COMMERCE_SETTINGS, ...settings };
+  return subtotal >= config.freeShippingThreshold ? 0 : config.shippingFee;
+}
+
+export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ['confirmed', 'cancelled'], confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'], shipped: ['delivered'],
+  delivered: [], cancelled: [], refunded: [],
+};

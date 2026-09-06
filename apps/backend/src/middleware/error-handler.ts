@@ -10,20 +10,14 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
+  const databaseError = err as ApiError & { code?: number; name?: string };
+  const statusCode = err.statusCode || (databaseError.code === 11000 ? 409 : ['ValidationError', 'CastError', 'ZodError'].includes(err.name) ? 400 : 500);
+  const message = databaseError.code === 11000 ? 'This record already exists.'
+    : statusCode >= 500 ? 'The service is temporarily unavailable. Please try again.'
+    : statusCode === 400 && !(err instanceof AppError) ? 'Invalid request data.' : err.message;
+  if (statusCode >= 500) console.error('Request failed', { name: err.name, statusCode });
+  res.status(statusCode).json({ success: false, message, error: message });
 
-  console.error('Error:', {
-    message: err.message,
-    stack: err.stack,
-    statusCode,
-  });
-
-  res.status(statusCode).json({
-    success: false,
-    error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
 };
 
 export class AppError extends Error {

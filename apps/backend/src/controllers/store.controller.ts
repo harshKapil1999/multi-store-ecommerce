@@ -3,7 +3,11 @@ import { Store } from '../models/store.model';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
 import { CreateStoreInput, UpdateStoreInput, ToggleStoreInput } from '../validators/store.schema';
+import { Billboard } from '../models/billboard.model';
 import { Category } from '../models/category.model';
+import { Order } from '../models/order.model';
+import { Transaction } from '../models/transaction.model';
+import { Page } from '../models/page.model';
 import { Product } from '../models/product.model';
 
 const validateHomeSectionResources = async (storeId: string, sections: CreateStoreInput['homeSections']) => {
@@ -104,7 +108,7 @@ export const getStoreBySlug = async (req: Request, res: Response, next: NextFunc
   try {
     const store = await Store.findOne({ slug: req.params.slug, isActive: true })
       .select('-owner')
-      .populate('homeBillboards');
+      .populate({ path: 'homeBillboards', match: { isActive: true } });
 
     if (!store) {
       throw new AppError('Store not found', 404);
@@ -112,7 +116,7 @@ export const getStoreBySlug = async (req: Request, res: Response, next: NextFunc
 
     // Filter out null billboards (in case referenced billboard was deleted)
     if (store.homeBillboards && Array.isArray(store.homeBillboards)) {
-      store.homeBillboards = store.homeBillboards.filter(b => b);
+      store.homeBillboards = store.homeBillboards.filter(b => b && String(b.storeId) === String(store._id));
     }
 
     res.json({ success: true, data: store });
@@ -154,6 +158,7 @@ export const updateStore = async (req: AuthRequest, res: Response, next: NextFun
     }
 
     await validateHomeSectionResources(String(store._id), input.homeSections);
+    if (input.homeBillboards && await Billboard.countDocuments({ _id: { $in: input.homeBillboards }, storeId: String(store._id) }) !== new Set(input.homeBillboards).size) throw new AppError('Hero slides must belong to this store.', 400);
 
     Object.assign(store, input);
     await store.save();
@@ -176,6 +181,9 @@ export const deleteStore = async (req: AuthRequest, res: Response, next: NextFun
       throw new AppError('Not authorized to delete this store', 403);
     }
 
+    const storeId = String(store._id);
+    const counts = await Promise.all([Order.countDocuments({storeId}), Transaction.countDocuments({storeId}), Product.countDocuments({storeId}), Category.countDocuments({storeId}), Billboard.countDocuments({storeId}), Page.countDocuments({storeId})]);
+    if (counts.some(Boolean)) throw new AppError('This store contains records. Deactivate it to preserve customer and catalog history.', 409);
     await store.deleteOne();
 
     res.json({ success: true, message: 'Store deleted successfully' });
@@ -201,4 +209,19 @@ export const toggleStoreActive = async (req: AuthRequest, res: Response, next: N
   } catch (error) {
     next(error);
   }
+};
+
+export const getStoreStats = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const store = await Store.findById(req.params.id);
+    if (!store) throw new AppError('Store not found', 404);
+    if (req.user!.role !== 'admin' && store.owner !== req.user!.id) throw new AppError('Not authorized', 403);
+    const storeId = String(store._id);
+    const [products, categories, orders, revenue, reviewOrders] = await Promise.all([
+      Product.countDocuments({storeId}), Category.countDocuments({storeId}), Order.countDocuments({storeId}),
+      Order.aggregate([{$match:{storeId, paymentStatus:'paid', status:{$nin:['cancelled','refunded']}}},{$group:{_id:null,total:{$sum:'$total'}}}]),
+      Order.countDocuments({storeId, inventoryStatus:'review'})
+    ]);
+    res.json({success:true,data:{products,categories,orders,revenue:revenue[0]?.total || 0,reviewOrders}});
+  } catch(error) { next(error); }
 };

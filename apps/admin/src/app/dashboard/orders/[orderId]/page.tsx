@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOrder, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { Button, Card, FormSelect, FormInput, FormTextarea } from '@/components/index';
 import { ArrowLeft, Package, User, MapPin, CreditCard, Loader2, Truck, Printer } from 'lucide-react';
+import { ORDER_TRANSITIONS } from '@repo/types';
 import type { OrderStatus, OrderItem, Order } from '@repo/types';
 import Image from 'next/image';
 
@@ -21,11 +22,12 @@ const statusColors: Record<OrderStatus, string> = {
 export default function OrderDetailPage({
   params,
 }: {
-  params: { orderId: string };
+  params: Promise<{ orderId: string }>;
 }) {
+  const { orderId } = use(params);
   const router = useRouter();
-  const { data, isLoading } = useOrder(params.orderId);
-  const updateStatusMutation = useUpdateOrderStatus(params.orderId);
+  const { data, isLoading } = useOrder(orderId);
+  const updateStatusMutation = useUpdateOrderStatus(orderId);
 
   const order = data?.data as Order | undefined;
   const [status, setStatus] = useState<OrderStatus>('pending');
@@ -122,6 +124,8 @@ export default function OrderDetailPage({
         </div>
       </div>
 
+      {order.inventoryStatus === 'review' && <Card className="border-amber-400 bg-amber-50 p-5 text-amber-950">Payment was received but this order needs stock reconciliation. Do not dispatch until resolved. Use the transaction page to refund if unavailable.</Card>}
+      {order.status === 'cancelled' && order.paymentStatus === 'paid' && <Card className="border-amber-400 p-5">This cancelled order has a captured payment. Issue its refund from Transactions.</Card>}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left column - Main content */}
         <div className="md:col-span-2 space-y-6">
@@ -300,8 +304,8 @@ export default function OrderDetailPage({
                 { value: 'shipped', label: 'Shipped' },
                 { value: 'delivered', label: 'Delivered' },
                 { value: 'cancelled', label: 'Cancelled' },
-                { value: 'refunded', label: 'Refunded' },
-              ]}
+
+              ].filter((option) => option.value === order.status || ORDER_TRANSITIONS[order.status].includes(option.value as OrderStatus))}
               value={status}
               onValueChange={(value) => setStatus(value as OrderStatus)}
             />

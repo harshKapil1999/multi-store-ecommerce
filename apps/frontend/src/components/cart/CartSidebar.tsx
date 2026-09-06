@@ -1,5 +1,6 @@
 "use client";
 
+import { getShipping, DEFAULT_COMMERCE_SETTINGS } from '@repo/types';
 import { ArrowRight, Heart, ShieldCheck, Truck, X, ShoppingBag, Trash2 } from 'lucide-react';
 import { useCart } from '@/lib/cart-store';
 import Link from 'next/link';
@@ -22,7 +23,7 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
 
   const storeItems = store ? items.filter((item) => item.storeId === store._id) : [];
   const subtotal = store ? getSubtotal(store._id) : 0;
-  const shipping = subtotal > 2500 ? 0 : 750;
+  const shipping = getShipping(subtotal, store?.commerce);
   const total = subtotal + shipping;
 
   return (
@@ -66,14 +67,14 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
               <div className="rounded-2xl bg-gray-50 p-4 text-sm dark:bg-white/5">
                 <div className="flex items-center gap-2 font-semibold">
                   <Truck className="h-4 w-4" />
-                  Free delivery on orders over ₹2,500
+                  Free delivery from ₹{(store?.commerce?.freeShippingThreshold ?? DEFAULT_COMMERCE_SETTINGS.freeShippingThreshold).toLocaleString('en-IN')}
                 </div>
                 <p className="mt-1 text-gray-500 dark:text-gray-400">
                   Review your items, then continue to secure checkout.
                 </p>
               </div>
               {storeItems.map((item) => {
-                const price = item.variant?.price || item.product?.sellingPrice || 0;
+                const price = item.variant?.price ?? item.product?.sellingPrice ?? 0;
                 const name = item.product?.name || '';
                 const image = item.variant?.images?.[item.variant?.featuredImageIndex || 0] || item.product?.featuredImage || '';
 
@@ -187,7 +188,7 @@ export function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
                 <ShieldCheck className="h-4 w-4" />
                 Secure checkout
               </div>
-              <p className="mt-1">Payment, address, and invoice details stay connected to this order.</p>
+              <p className="mt-1">Review your delivery details before placing your order.</p>
             </div>
 
             <div className="flex flex-col gap-4">

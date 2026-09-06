@@ -15,6 +15,7 @@ type RouteContext = {
 };
 
 async function forward(request: NextRequest, context: RouteContext) {
+  if (!['GET', 'HEAD'].includes(request.method) && request.headers.get('origin') && request.headers.get('origin') !== new URL(request.url).origin) return NextResponse.json({ message: 'Invalid request origin' }, { status: 403 });
   const session = await getSession();
   const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
 
@@ -32,6 +33,8 @@ async function forward(request: NextRequest, context: RouteContext) {
   if (contentType) headers.set('content-type', contentType);
   if (accept) headers.set('accept', accept);
   headers.set('cookie', `${ADMIN_SESSION_COOKIE}=${sessionToken}`);
+
+  headers.set('x-forwarded-for', request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1');
 
   const method = request.method.toUpperCase();
   const body = method === 'GET' || method === 'HEAD'
