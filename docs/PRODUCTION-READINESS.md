@@ -1,4 +1,4 @@
-# Crabtile release — 6 September 2026
+# Crabtile release — 6–7 September 2026
 
 ## Deployed applications
 
@@ -7,8 +7,8 @@
 - API: https://shopbackend.crabtile.com
 - Backend revision: `crabtile-shop-backend-00013-thz` (100% traffic).
 - Cloud Build: `13ccb429-123a-4b6b-a580-a31c3f48e4da`.
-- Initial storefront deployment: `dpl_5q2zw8UPxdvfMEusJhRVvKH4qR2h`.
-- Initial admin deployment: `dpl_41ajvygVw5ebsXwZivya5kDuiywR`.
+- Storefront deployment: `dpl_BgDYE3LZbq6QDsiJPDsjNgqV1uLZ`.
+- Admin deployment: `dpl_kZwUEkFqAmP5oZbwcMjnRKTmTJSm`.
 
 ## Completed work
 
@@ -36,7 +36,7 @@ Public pages include About, Contact, Terms, Privacy (including purposes of data 
 - Mobile landing and catalog fit a 390 px viewport; price sorting passed. Closed mobile navigation and collapsed category links are excluded from keyboard/accessibility navigation.
 - Test refund initiation remains blocked: Razorpay returned HTTP 400, `invalid request sent`, through both its SDK and direct documented API. Provider inspection confirmed no refund exists and the payment is still captured. The admin now clears a definitively rejected refund claim and shows the error; uncertain network failures remain pending for reconciliation. Automated refund lifecycle and duplicate-webhook tests pass.
 - The one QA item was restored to stock (4 → 5) in a guarded database transaction. The order/payment evidence remains for audit, with a test-cleanup note.
-- GitHub Actions now runs installation, lint, build, isolated commerce tests and the production dependency audit on pull requests and main pushes.
+- GitHub Actions passed for commit `1d2cce0` ([run](https://github.com/harshKapil1999/multi-store-ecommerce/actions/runs/34049193484)). The workflow now runs installation, lint, build, isolated commerce tests and the production dependency audit on pull requests and main pushes.
 - Test payment reference: `pay_TYkbiCYt0BbSwO`; transaction `6a9d5bcb17e2954fdcdcf82a`.
 
 ## Store cleanup and recovery

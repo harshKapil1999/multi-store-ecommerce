@@ -26,13 +26,14 @@ export const FormInput = forwardRef<
 >(({ label, error, required, helperText, className, ...props }, ref) => (
   <div className="space-y-2">
     {label && (
-      <Label>
+      <Label htmlFor={props.id || props.name}>
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </Label>
     )}
     <Input
       ref={ref}
+      id={props.id || props.name}
       className={cn(className, error && 'border-red-500')}
       {...props}
     />
@@ -48,13 +49,14 @@ export const FormTextarea = forwardRef<
 >(({ label, error, required, helperText, className, ...props }, ref) => (
   <div className="space-y-2">
     {label && (
-      <Label>
+      <Label htmlFor={props.id || props.name}>
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
       </Label>
     )}
     <Textarea
       ref={ref}
+      id={props.id || props.name}
       className={cn(className, error && 'border-red-500')}
       {...props}
     />

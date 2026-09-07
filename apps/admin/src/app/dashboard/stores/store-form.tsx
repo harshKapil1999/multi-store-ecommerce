@@ -141,10 +141,10 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
   }, [nameValue, store, setValue]);
 
   const handleFormSubmit = async (data: StoreFormData) => {
-    // Remove empty optional fields
+    // Preserve empty values so existing optional fields can be cleared.
     const cleanedData = {
       ...data,
-      domain: data.domain || undefined,
+      domain: data.domain || '',
       description: data.description || '',
       logo: data.logo || '',
     };
@@ -197,7 +197,7 @@ export function StoreForm({ store, onSubmit, isLoading = false }: StoreFormProps
         <p className="text-sm text-muted-foreground">These details appear on your contact and policy pages. Shipping fees are also used at checkout. Review them before accepting orders.</p>
         <div className="grid gap-4 md:grid-cols-2">
           <FormInput label="Legal business name" {...register('commerce.businessName')} />
-          <FormInput label="Support email" type="email" {...register('commerce.supportEmail')} />
+          <Controller name="commerce.supportEmail" control={control} render={({ field }) => <FormInput label="Support email" type="email" autoComplete="off" {...field} value={field.value || ''} error={errors.commerce && (errors.commerce as any).supportEmail?.message} />} />
           <FormInput label="Support phone (optional)" {...register('commerce.supportPhone')} />
           <FormInput label="Grievance officer name" {...register('commerce.grievanceName')} />
           <FormInput label="Grievance contact email" {...register('commerce.grievanceEmail')} />
