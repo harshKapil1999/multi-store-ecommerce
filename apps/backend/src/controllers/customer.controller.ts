@@ -1,5 +1,7 @@
 import { NextFunction, Response } from 'express';
-import type { PipelineStage } from 'mongoose';
+import { sql } from 'drizzle-orm';
+import { getDB } from '../config/database';
+import { OrderTable } from '../db/schema';
 import type { CustomerAddress } from '@repo/types';
 import { Order } from '../models/order.model';
 import { AppError } from '../middleware/error-handler';
@@ -33,79 +35,30 @@ export const getStoreCustomers = async (
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const search = String(req.query.search || '').trim();
 
-    const groupedMatch = search
-      ? {
-          $or: [
-            { _id: { $regex: escapeRegex(search), $options: 'i' } },
-            { name: { $regex: escapeRegex(search), $options: 'i' } },
-            { phone: { $regex: escapeRegex(search), $options: 'i' } },
-          ],
-        }
-      : undefined;
-
-    const pipeline: PipelineStage[] = [
-      { $match: { storeId } },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: { $toLower: '$customer.email' },
-          name: { $first: '$customer.name' },
-          phone: { $first: '$customer.phone' },
-          userId: { $first: '$customer.userId' },
-          orderCount: { $sum: 1 },
-          totalSpent: {
-            $sum: {
-              $cond: [
-                { $and: [{ $eq: ['$paymentStatus', 'paid'] }, { $not: [{ $in: ['$status', ['cancelled', 'refunded']] }] }] },
-                '$total',
-                0,
-              ],
-            },
-          },
-          lastOrderAt: { $first: '$createdAt' },
-          lastOrderStatus: { $first: '$status' },
-          latestShippingAddress: { $first: '$shippingAddress' },
-        },
-      },
-    ];
-
-    if (groupedMatch) pipeline.push({ $match: groupedMatch });
-
-    pipeline.push(
-      { $sort: { lastOrderAt: -1 } },
-      {
-        $facet: {
-          customers: [
-            { $skip: (page - 1) * limit },
-            { $limit: limit },
-            {
-              $project: {
-                _id: 0,
-                id: '$_id',
-                email: '$_id',
-                name: 1,
-                phone: 1,
-                userId: 1,
-                orderCount: 1,
-                totalSpent: 1,
-                lastOrderAt: 1,
-                lastOrderStatus: 1,
-                latestShippingAddress: 1,
-              },
-            },
-          ],
-          count: [{ $count: 'total' }],
-        },
-      }
-    );
-
-    const [result] = await Order.aggregate(pipeline);
-    const total = result?.count?.[0]?.total || 0;
+    const result = await getDB().execute(sql`
+      WITH customers AS (
+        SELECT lower(customer->>'email') AS id, lower(customer->>'email') AS email,
+          (array_agg(customer->>'name' ORDER BY "createdAt" DESC))[1] AS name,
+          (array_agg(customer->>'phone' ORDER BY "createdAt" DESC))[1] AS phone,
+          (array_agg(customer->>'userId' ORDER BY "createdAt" DESC))[1] AS "userId",
+          count(*)::int AS "orderCount",
+          sum(CASE WHEN "paymentStatus" = 'paid' AND status NOT IN ('cancelled','refunded') THEN total ELSE 0 END) AS "totalSpent",
+          max("createdAt") AS "lastOrderAt",
+          (array_agg(status ORDER BY "createdAt" DESC))[1] AS "lastOrderStatus",
+          (array_agg("shippingAddress" ORDER BY "createdAt" DESC))[1] AS "latestShippingAddress"
+        FROM ${OrderTable} WHERE "storeId" = ${storeId} GROUP BY lower(customer->>'email')
+      ), filtered AS (
+        SELECT * FROM customers WHERE ${search} = '' OR position(lower(${search}) in lower(concat(email, ' ', name, ' ', phone))) > 0
+      ) SELECT (SELECT count(*)::int FROM filtered) AS total,
+        coalesce((SELECT jsonb_agg(row_to_json(page_rows)) FROM
+          (SELECT * FROM filtered ORDER BY "lastOrderAt" DESC LIMIT ${limit} OFFSET ${(page - 1) * limit}) page_rows), '[]'::jsonb) AS customers
+    `);
+    const total = Number(result.rows[0]?.total || 0);
 
     res.json({
       success: true,
       data: {
-        data: result?.customers || [],
+        data: result.rows[0]?.customers || [],
         total,
         page,
         limit,

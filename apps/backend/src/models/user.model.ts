@@ -1,53 +1,11 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { createRepository, Entity } from '../db/repository';
+import { UserTable } from '../db/schema';
 import type { User as UserType } from '@repo/types';
 
-export interface IUser extends Omit<UserType, '_id'>, Document {
+export interface IUser extends Omit<UserType, '_id'>, Entity {
   password: string;
   emailVerified: boolean;
 }
 
-const userSchema = new Schema<IUser>(
-  {
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-      lowercase: true,
-      trim: true,
-    },
-    emailVerified: { type: Boolean, default: false },
-    password: {
-      type: String,
-      required: true,
-    },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    role: {
-      type: String,
-      enum: ['customer', 'admin', 'store_owner'],
-      default: 'customer',
-    },
-    addresses: [
-      {
-        firstName: String,
-        lastName: String,
-        address1: String,
-        address2: String,
-        city: String,
-        state: String,
-        country: String,
-        postalCode: String,
-        phone: String,
-        isDefault: { type: Boolean, default: false },
-      }
-    ],
-  },
-  {
-    timestamps: true,
-  }
-);
 
-export const User = mongoose.model<IUser>('User', userSchema);
+export const User = createRepository<IUser>('User', UserTable);

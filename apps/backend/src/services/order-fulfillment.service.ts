@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import { startSession } from '../config/database';
 import { AppError } from '../middleware/error-handler';
 import { Order } from '../models/order.model';
 import { Transaction } from '../models/transaction.model';
@@ -14,7 +14,7 @@ export async function finalizeCapturedPayment(params: {
   razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature?: string;
   method?: string; email?: string; phone?: string; amount?: number; currency?: string;
 }): Promise<FulfillmentResult> {
-  const session = await mongoose.startSession();
+  const session = await startSession();
   let result: FulfillmentResult | undefined;
   try {
     const apply = async (review: boolean) => {

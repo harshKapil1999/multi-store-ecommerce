@@ -1,61 +1,8 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { createRepository, Entity } from '../db/repository';
+import { CategoryTable } from '../db/schema';
 import type { Category as CategoryType } from '@repo/types';
 
-export interface ICategory extends Omit<CategoryType, '_id'>, Document { }
+export interface ICategory extends Omit<CategoryType, '_id'>, Entity { }
 
-const categorySchema = new Schema<ICategory>(
-  {
-    storeId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    slug: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    description: {
-      type: String,
-    },
-    imageUrl: {
-      type: String,
-    },
-    parentId: {
-      type: String,
-      index: true,
-    },
-    isFeatured: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    order: {
-      type: Number,
-      default: 0,
-      index: true,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-      index: true,
-    },
-    billboards: [{
-      type: Schema.Types.ObjectId,
-      ref: 'Billboard'
-    }],
-  },
-  {
-    timestamps: true,
-  }
-);
 
-// Compound index for store and slug
-categorySchema.index({ storeId: 1, slug: 1 }, { unique: true });
-
-export const Category = mongoose.model<ICategory>('Category', categorySchema);
+export const Category = createRepository<ICategory>('Category', CategoryTable);

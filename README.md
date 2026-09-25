@@ -1,6 +1,6 @@
 # Multi-Store E-Commerce Platform
 
-A scalable multi-tenant e-commerce platform built with Turborepo, Next.js 16, Node.js, Express, and MongoDB.
+A scalable multi-tenant e-commerce platform built with Turborepo, Next.js 16, Node.js, Express, and PostgreSQL.
 
 ## 🏗️ Architecture
 
@@ -9,7 +9,7 @@ This monorepo contains:
 ### Apps
 - **Frontend** (`apps/frontend`) - Customer-facing store (Next.js 16 + TanStack Query)
 - **Admin** (`apps/admin`) - Multi-tenant admin dashboard (Next.js 16)
-- **Backend** (`apps/backend`) - RESTful API server (Node.js + Express + MongoDB)
+- **Backend** (`apps/backend`) - RESTful API server (Node.js + Express + PostgreSQL)
 
 ### Packages
 - **@repo/types** - Shared TypeScript interfaces and types
@@ -22,7 +22,7 @@ This monorepo contains:
 
 - Node.js >= 18
 - pnpm >= 9
-- MongoDB (local or cloud instance)
+- PostgreSQL (local or cloud instance)
 - Git
 
 ### Installation
@@ -43,7 +43,7 @@ This monorepo contains:
    ```bash
    cp apps/backend/.env.example apps/backend/.env
    ```
-   Edit the file and add your MongoDB URI and other credentials.
+   Edit the file and add your PostgreSQL URL and other credentials.
 
    **Frontend** (`apps/frontend/.env.local`):
    ```bash
@@ -152,30 +152,16 @@ pnpm clean
 
 ## 🗄️ Database Setup
 
-### MongoDB
+### PostgreSQL and Redis
 
-The backend requires MongoDB. You can use:
+Use PostgreSQL locally or Neon in production. Set `DATABASE_URL` (or `DATABASE_CONNECTION_STRING`) and `REDIS_URL` in `apps/backend/.env`, then run:
 
-1. **Local MongoDB:**
-   ```bash
-   mongod --dbpath /path/to/data
-   ```
-
-2. **MongoDB Atlas (Cloud):**
-   - Create a free cluster at https://www.mongodb.com/cloud/atlas
-   - Get connection string and add to `apps/backend/.env`
-
-3. **Docker:**
-   ```bash
-   docker run -d -p 27017:27017 --name mongodb mongo:latest
-   ```
-
-Update `MONGODB_URI` in `apps/backend/.env`:
-```
-MONGODB_URI=mongodb://localhost:27017/ecommerce
+```bash
+pnpm --filter @repo/backend build
+pnpm --filter @repo/backend db:migrate
 ```
 
-## 📦 API Endpoints
+See [PostgreSQL, caching, shipping and scale-to-zero setup](docs/POSTGRES-REDIS-SHIPPING.md).
 
 ### Authentication
 - `POST /api/users/register` - Register new user
@@ -231,7 +217,7 @@ MONGODB_URI=mongodb://localhost:27017/ecommerce
 - **Runtime:** Node.js
 - **Framework:** Express
 - **Language:** TypeScript
-- **Database:** MongoDB with Mongoose
+- **Database:** PostgreSQL with Drizzle
 - **Authentication:** JWT + bcrypt
 - **Validation:** express-validator
 - **File Storage:** Cloudflare R2 (S3 compatible)
@@ -293,7 +279,7 @@ MONGODB_URI=mongodb://localhost:27017/ecommerce
 ```env
 NODE_ENV=development
 PORT=4000
-MONGODB_URI=mongodb://localhost:27017/ecommerce
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ecommerce
 JWT_SECRET=your-super-secret-jwt-key
 R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=your-r2-access-key-id

@@ -52,3 +52,5 @@ docs/*
 # Local release backups (may contain customer data)
 .local-backups/
 !docs/PRODUCTION-READINESS.md
+
+!docs/POSTGRES-REDIS-SHIPPING.md

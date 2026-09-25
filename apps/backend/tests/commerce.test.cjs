@@ -1,10 +1,12 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const mongoose = require('mongoose');
+const { disconnectDB } = require('../dist/config/database');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { MongoMemoryReplSet } = require('mongodb-memory-server');
+if (!process.env.TEST_DATABASE_URL) throw new Error('Set TEST_DATABASE_URL to an isolated PostgreSQL test database');
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+process.env.REDIS_URL = '';
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = crypto.randomBytes(48).toString('hex');
 process.env.SESSION_SECRET = crypto.randomBytes(48).toString('hex');
@@ -27,8 +29,11 @@ const address = { firstName:'Test',lastName:'Buyer',addressLine1:'Test address o
 const payload = (extra={}) => ({storeId:String(store._id),items:[{productId:String(product._id),quantity:1}],customer:{firstName:'Test',lastName:'Buyer',email:customer.email,phone:'9999999999'},shippingAddress:address,billingAddress:address,paymentMethod:'razorpay',checkoutKey:crypto.randomUUID(),...extra});
 const create = body => request(app).post('/api/v1/orders').set('Authorization',`Bearer ${token}`).send(body);
 before(async()=>{
- repl=await MongoMemoryReplSet.create({replSet:{count:1}}); await mongoose.connect(repl.getUri());
- await Promise.all([User.init(),Order.init(),Transaction.init(),Otp.init()]);
+ const { sql } = require('drizzle-orm');
+ const { getDB } = require('../dist/config/database');
+ const { migrate } = require('drizzle-orm/node-postgres/migrator');
+ await migrate(getDB(), { migrationsFolder: require('node:path').join(__dirname, '../drizzle') });
+ await getDB().execute(sql`TRUNCATE TABLE "order", "user", store, product, category, transaction, otp, page, billboard, newsletter_subscriber, product_variant CASCADE`);
  customer=await User.create({email:'buyer@example.test',name:'Test',password:'unused',role:'customer',emailVerified:true});
  const other=await User.create({email:'other@example.test',name:'Other',password:'unused',role:'customer',emailVerified:true});
  token=makeToken(customer);otherToken=makeToken(other);
@@ -36,7 +41,7 @@ before(async()=>{
  category=await Category.create({storeId:String(store._id),name:'Test',slug:'test',isActive:true});
  product=await Product.create({storeId:String(store._id),name:'Test product',slug:'test-product',description:'Actual description',featuredImage:'https://example.test/product.jpg',mrp:100,sellingPrice:100,stock:20,isActive:true,categoryId:String(category._id)});
 });
-after(async()=>{await mongoose.disconnect();if(repl)await repl.stop()});
+after(async()=>{await disconnectDB()});
 test('registration ignores attacker-supplied elevated roles and requires verified email',async()=>{
  const noCode=await request(app).post('/api/v1/users/register').send({email:'attack@example.test',name:'Test',password:'test-password-123',role:'admin'});assert.equal(noCode.status,400);
  const otp=await issueOtp('signup@example.test');
@@ -106,7 +111,8 @@ test('draft products stay private even with includeInactive=true',async()=>{
 test('store managers cannot move products into another tenant and unsafe variants are rejected',async()=>{
  const owner=await User.create({email:'owner@example.test',name:'Owner',password:'unused',role:'store_owner',emailVerified:true});
  const ownerToken=makeToken(owner);await Store.updateOne({_id:store._id},{$set:{owner:String(owner._id)}});
- const foreign=await Category.create({storeId:String(new mongoose.Types.ObjectId()),name:'Foreign',slug:'foreign'});
+ const foreignStore=await Store.create({name:'Foreign',slug:'foreign'});
+ const foreign=await Category.create({storeId:foreignStore._id,name:'Foreign',slug:'foreign'});
  assert.equal((await request(app).put(`/api/v1/stores/${store._id}/products/${product._id}`).set('Authorization',`Bearer ${ownerToken}`).send({categoryId:String(foreign._id)})).status,400);
  assert.equal((await request(app).post(`/api/v1/products/${product._id}/variants`).set('Authorization',`Bearer ${ownerToken}`).send({name:'Bad',sku:'bad',price:1,stock:0.5,attributes:{}})).status,400);
  assert.equal((await request(app).get(`/api/v1/products/${product._id}/variants`).set('Authorization',`Bearer ${token}`)).status,404);
@@ -150,4 +156,108 @@ test('definitive refund rejection unlocks the request and records an actionable 
  const original=PaymentService.createRefund;PaymentService.createRefund=async()=>{throw new AppError('Provider rejected the refund',400)};
  try{assert.equal((await request(app).post('/api/v1/payment/refund').set('Authorization',`Bearer ${makeToken(owner)}`).send({transactionId:String(transaction._id)})).status,400);
  const updated=await Transaction.findById(transaction._id);assert.equal(updated.refundPending,false);assert.match(updated.refundError,/rejected/);assert.equal(updated.status,'captured');}finally{PaymentService.createRefund=original;}
+});
+test('page home selection is transactional and JSON addresses remain editable', async () => {
+ const {Page}=require('../dist/models/page.model');
+ const root=await Category.create({storeId:store._id,name:'Root',slug:'root-empty-parent',parentId:''});assert.equal((await Category.findById(root._id)).parentId,undefined);
+ const a=await Page.create({storeId:store._id,title:'First',slug:'first',isHomePage:true});
+ const b=await Page.create({storeId:store._id,title:'Second',slug:'second',isHomePage:true});
+ assert.equal((await Page.findById(a._id)).isHomePage,false);assert.equal((await Page.findById(b._id)).isHomePage,true);
+ await Page.findByIdAndUpdate(a._id,{$set:{isHomePage:true}});
+ assert.equal((await Page.findById(b._id)).isHomePage,false);
+ await User.updateOne({_id:customer._id},{$set:{addresses:[{...address,address1:'Test address',postalCode:'171001'}]}});
+ const saved=await User.findById(customer._id);assert.match(saved.addresses[0]._id,/^[a-f0-9]{24}$/);
+ await Order.updateMany({'customer.email':customer.email},{$set:{'customer.userId':customer._id}});
+ assert.ok(await Order.exists({'customer.userId':customer._id}));
+});
+test('Shiprocket creation is authorized, idempotent, and blocks unsafe cancellation',async()=>{
+ const service=require('../dist/services/shiprocket.service');
+ const {getDB}=require('../dist/config/database');const {ShipmentTable}=require('../dist/db/schema');
+ const {eq}=require('drizzle-orm');
+ process.env.SHIPROCKET_EMAIL='api@example.com';process.env.SHIPROCKET_PASSWORD='mock-password';
+ const original=service.shiprocketRequest;let calls=0;
+ service.shiprocketRequest=async()=>{calls++;return {order_id:98765,shipment_id:76543}};
+ try {
+  const owner=await User.findOne({email:'owner@example.test'}),ownerToken=makeToken(owner);
+  const made=await create(payload({paymentMethod:'cod'}));assert.equal(made.status,201);
+  const id=made.body.data._id,url=`/api/v1/orders/${id}/shipment`;
+  const parcel={pickupLocation:'Warehouse',pickupPincode:'171001',weight:0.5,length:10,breadth:10,height:5};
+  assert.equal((await request(app).post(url).set('Authorization',`Bearer ${token}`).send(parcel)).status,403);
+  const results=await Promise.all([1,2].map(()=>request(app).post(url).set('Authorization',`Bearer ${ownerToken}`).send(parcel)));
+  assert.ok(results.every(r=>[200,201,409].includes(r.status)),JSON.stringify(results.map(r=>r.body)));assert.equal(calls,1);
+  assert.equal((await request(app).put(`/api/v1/orders/${id}/status`).set('Authorization',`Bearer ${ownerToken}`).send({status:'cancelled'})).status,409);
+  assert.equal((await request(app).get(url).set('Authorization',`Bearer ${otherToken}`)).status,403);
+  let assignments=0;
+  service.shiprocketRequest=async endpoint=>{
+   if(endpoint.endsWith('/awb')){assignments++;return {awb_assign_status:1,response:{data:{awb_code:'MOCKAWB',courier_name:'Mock courier'}}};}
+   if(endpoint.endsWith('/pickup'))return {pickup_status:1};
+   if(endpoint.endsWith('/label'))return {label_url:'https://example.test/label.pdf'};
+   throw new Error('Unexpected shipping endpoint');
+  };
+  const shipAction=(kind,body={})=>request(app).post(`${url}/${kind}`).set('Authorization',`Bearer ${ownerToken}`).send(body);
+  assert.equal((await shipAction('assign',{courierId:1})).status,200);
+  assert.equal((await shipAction('assign',{courierId:1})).status,200);assert.equal(assignments,1);
+  const fulfillment=(await Order.findById(id)).fulfillment;assert.equal(fulfillment.trackingNumber,'MOCKAWB');assert.equal(fulfillment.carrier,'Mock courier');assert.match(fulfillment.trackingUrl,/MOCKAWB/);
+  assert.equal((await shipAction('pickup')).status,200);
+  assert.equal((await shipAction('label')).status,200);
+
+  await getDB().update(ShipmentTable).set({state:'cancelled'}).where(eq(ShipmentTable.orderId,id));
+  assert.equal((await request(app).put(`/api/v1/orders/${id}/status`).set('Authorization',`Bearer ${ownerToken}`).send({status:'cancelled'})).status,200);
+ } finally {service.shiprocketRequest=original;}
+});
+test('uncertain shipment creation cannot create duplicate provider orders',async()=>{
+ const service=require('../dist/services/shiprocket.service'),original=service.shiprocketRequest;let calls=0;
+ service.shiprocketRequest=async()=>{calls++;throw new Error('simulated timeout')};
+ try {
+  const ownerToken=makeToken(await User.findOne({email:'owner@example.test'}));
+  const made=await create(payload({paymentMethod:'cod'}));const url=`/api/v1/orders/${made.body.data._id}/shipment`;
+  const parcel={pickupLocation:'Warehouse',pickupPincode:'171001',weight:0.5,length:10,breadth:10,height:5};
+  assert.equal((await request(app).post(url).set('Authorization',`Bearer ${ownerToken}`).send(parcel)).status,500);
+  assert.equal((await request(app).post(url).set('Authorization',`Bearer ${ownerToken}`).send(parcel)).status,409);assert.equal(calls,1);
+ }finally {service.shiprocketRequest=original;}
+});
+test('shipping webhooks authenticate and do not regress delivered orders',async()=>{
+ const {getDB}=require('../dist/config/database');const {ShipmentTable}=require('../dist/db/schema');
+ const made=await create(payload({paymentMethod:'cod'}));const id=made.body.data._id;
+ await getDB().insert(ShipmentTable).values({orderId:id,providerOrderId:'123456',providerShipmentId:'123457',state:'created',awb:'TESTAWB',parcel:{}});
+ process.env.SHIPROCKET_WEBHOOK_SECRET=crypto.randomBytes(32).toString('hex');
+ const body={sr_order_id:123456,awb:'TESTAWB',current_status:'DELIVERED',current_timestamp:'09 09 2026 12:00:00'};
+ assert.equal((await request(app).post('/api/v1/delivery/events').send(body)).status,401);
+ const send=data=>request(app).post('/api/v1/delivery/events').set('x-api-key',process.env.SHIPROCKET_WEBHOOK_SECRET).send(data);
+ assert.equal((await send(body)).status,200);assert.equal((await send({...body,current_status:'IN TRANSIT',current_timestamp:'08 09 2026 12:00:00'})).status,200);
+ const updated=await Order.findById(id);assert.equal(updated.status,'delivered');assert.equal(updated.paymentStatus,'paid');
+ assert.equal(updated.statusHistory.filter(h=>h.status==='delivered').length,1);
+});
+test('Redis caches only public catalog, invalidates on writes, and survives cache outages', {skip:!process.env.TEST_REDIS_URL}, async()=>{
+ const cache=require('../dist/services/cache.service');
+ process.env.REDIS_URL=process.env.TEST_REDIS_URL;process.env.CACHE_NAMESPACE=`commerce-test-${crypto.randomUUID()}`;
+ try {
+  const url=`/api/v1/stores/${store._id}/products`;
+  const first=await request(app).get(url);assert.equal(first.headers['x-cache'],'MISS');
+  const second=await request(app).get(url);assert.equal(second.headers['x-cache'],'HIT');
+  await Product.updateOne({_id:product._id},{$set:{name:'Updated cached product'}});
+  const fresh=await request(app).get(url);assert.equal(fresh.headers['x-cache'],'MISS');assert.equal(fresh.body.data.data.find(p=>p._id===product._id).name,'Updated cached product');
+  const privateRead=await request(app).get(url).set('Authorization',`Bearer ${token}`);assert.equal(privateRead.headers['x-cache'],undefined);
+  const {getDB}=require('../dist/config/database'),original=getDB().execute;
+  getDB().execute=()=>{throw Error('health must not query DB')};
+  try {assert.equal((await request(app).get('/health')).status,200)}finally{getDB().execute=original;}
+  const redis=await cache.getRedis();await redis.del(`${process.env.CACHE_NAMESPACE}:commerce:v1:catalog-generation`);
+  await cache.closeRedis();process.env.REDIS_URL='redis://127.0.0.1:1';
+  assert.equal((await request(app).get(url)).status,200);
+ }finally{await cache.closeRedis();process.env.REDIS_URL='';}
+});
+test('SQL catalog relationships, full-text search and customer summaries preserve API responses',async()=>{
+ const {Billboard}=require('../dist/models/billboard.model');
+ const {searchProducts}=require('../dist/services/product-search.service');
+ const hero=await Billboard.create({storeId:store._id,title:'Hero',imageUrl:'https://example.test/hero.jpg',isActive:true});
+ await Store.updateOne({_id:store._id},{$set:{homeBillboards:[hero._id]}});
+ const storefront=await request(app).get(`/api/v1/stores/slug/${store.slug}`);
+ assert.equal(storefront.status,200);assert.equal(storefront.body.data.homeBillboards[0].title,'Hero');
+ await Product.updateOne({_id:product._id},{$set:{name:'Running Shoe',isActive:true}});
+ const matches=await searchProducts({storeId:store._id,isActive:true},'RunningShoe');assert.ok(matches.some(item=>item._id===product._id));
+ const ownerToken=makeToken(await User.findOne({email:'owner@example.test'}));
+ const customers=await request(app).get(`/api/v1/stores/${store._id}/customers?search=buyer`).set('Authorization',`Bearer ${ownerToken}`);
+ assert.equal(customers.status,200,JSON.stringify(customers.body));assert.ok(customers.body.data.total>=1);assert.equal(typeof customers.body.data.data[0].totalSpent,'number');
+ const stats=await request(app).get(`/api/v1/stores/${store._id}/stats`).set('Authorization',`Bearer ${ownerToken}`);
+ assert.equal(stats.status,200,JSON.stringify(stats.body));
 });

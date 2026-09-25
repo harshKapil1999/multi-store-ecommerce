@@ -1,3 +1,4 @@
+import { shippingWebhook } from './controllers/shipping.controller';
 import express, { Application } from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -5,7 +6,9 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import helmet from 'helmet';
-import mongoose from 'mongoose';
+import { disconnectDB } from './config/database';
+import { closeRedis } from './services/cache.service';
+import { catalogCache } from './middleware/catalog-cache';
 import { connectDB } from './config/database';
 import { errorHandler } from './middleware/error-handler';
 import { validateStoreContext } from './middleware/store-context';
@@ -31,7 +34,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 if (process.env.NODE_ENV === 'production') {
   const requiredEnvironment = [
-    'MONGODB_URI',
+    ...(process.env.DATABASE_CONNECTION_STRING ? [] : ['DATABASE_URL']),
     'JWT_SECRET',
     'SESSION_SECRET',
     'ALLOWED_ORIGINS',
@@ -106,13 +109,11 @@ app.get('/', (req, res) => {
   });
 });
 
-app.get('/health', (req, res) => {
-  const databaseReady = mongoose.connection.readyState === 1;
-  res.status(databaseReady ? 200 : 503).json({
-    status: databaseReady ? 'ok' : 'degraded',
-    database: databaseReady ? 'connected' : 'unavailable',
-  });
-});
+// Liveness must not wake the database or create periodic SQL activity.
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+app.use('/api/v1', catalogCache);
+
+app.post('/api/v1/delivery/events', shippingWebhook);
 
 // Store Management API
 app.use('/api/v1/stores', storeRoutes);
@@ -160,7 +161,8 @@ async function startServer() {
 
     server.close(async (error) => {
       try {
-        await mongoose.disconnect();
+        await disconnectDB();
+        await closeRedis();
       } finally {
         clearTimeout(forceExit);
         process.exit(error ? 1 : 0);

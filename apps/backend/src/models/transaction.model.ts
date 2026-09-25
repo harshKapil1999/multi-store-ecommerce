@@ -1,74 +1,8 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { createRepository, Entity } from '../db/repository';
+import { TransactionTable } from '../db/schema';
 import type { Transaction as TransactionType } from '@repo/types';
 
-export interface ITransaction extends Omit<TransactionType, '_id'>, Document { }
+export interface ITransaction extends Omit<TransactionType, '_id'>, Entity { }
 
-const transactionSchema = new Schema<ITransaction>(
-    {
-        refundError: String,
-        refundPending: { type: Boolean, default: false },
-        refundId: String,
-        orderId: {
-            type: String,
-            required: true,
-            index: true,
-        },
-        storeId: {
-            type: String,
-            required: true,
-            index: true,
-        },
-        razorpayOrderId: {
-            type: String,
-            required: true,
-            unique: true,
-        },
-        razorpayPaymentId: {
-            type: String,
-            sparse: true,
-        },
-        razorpaySignature: {
-            type: String,
-        },
-        amount: {
-            type: Number,
-            required: true,
-            min: 0,
-        },
-        currency: {
-            type: String,
-            required: true,
-            default: 'INR',
-        },
-        status: {
-            type: String,
-            enum: ['created', 'authorized', 'captured', 'failed', 'refunded'],
-            default: 'created',
-            index: true,
-        },
-        method: {
-            type: String,
-        },
-        email: {
-            type: String,
-        },
-        phone: {
-            type: String,
-        },
-        notes: {
-            type: Map,
-            of: String,
-        },
-        errorCode: {
-            type: String,
-        },
-        errorDescription: {
-            type: String,
-        },
-    },
-    {
-        timestamps: true,
-    }
-);
 
-export const Transaction = mongoose.model<ITransaction>('Transaction', transactionSchema);
+export const Transaction = createRepository<ITransaction>('Transaction', TransactionTable);

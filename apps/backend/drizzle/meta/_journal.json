@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1789055466297,
+      "tag": "0000_giant_sumo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789055769175,
+      "tag": "0001_large_turbo",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789055856039,
+      "tag": "0002_fuzzy_leopardon",
+      "breakpoints": true
+    }
+  ]
+}

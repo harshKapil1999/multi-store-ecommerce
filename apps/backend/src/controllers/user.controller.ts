@@ -9,7 +9,7 @@ import { mailService } from '../services/mail.service';
 import { AppError } from '../middleware/error-handler';
 import { AuthRequest } from '../middleware/auth';
 
-import mongoose from 'mongoose';
+import { newId, isValidId } from '../db/repository';
 import { Order } from '../models/order.model';
 
 
@@ -343,13 +343,13 @@ export const updateAddress = async (req: AuthRequest, res: Response, next: NextF
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) throw new AppError('Complete all required address fields', 400);
-    if (!mongoose.isValidObjectId(req.params.addressId)) throw new AppError('Invalid address', 400);
+    if (!isValidId(req.params.addressId)) throw new AppError('Invalid address', 400);
     const user = await User.findById(req.user!.id);
     if (!user) throw new AppError('User not found', 404);
     const addresses = user.addresses || [];
-    const address = (addresses as any).id(req.params.addressId);
+    const address = addresses.find((entry: any) => entry._id === req.params.addressId);
     if (!address) throw new AppError('Address not found', 404);
-    const nextAddress = normalizeAddress({ ...address.toObject(), ...req.body });
+    const nextAddress = normalizeAddress({ ...address, ...req.body });
     if (nextAddress.isDefault) addresses.forEach((item: any) => { item.isDefault = false; });
     Object.assign(address, nextAddress);
     await user.save();
@@ -364,11 +364,11 @@ export const deleteAddress = async (req: AuthRequest, res: Response, next: NextF
     const user = await User.findById(req.user!.id);
     if (!user) throw new AppError('User not found', 404);
     const addresses = user.addresses || [];
-    const address = (addresses as any).id(req.params.addressId);
+    const address = addresses.find((entry: any) => entry._id === req.params.addressId);
     if (!address) throw new AppError('Address not found', 404);
     const wasDefault = address.isDefault;
-    address.deleteOne();
-    if (wasDefault && addresses[0]) (addresses[0] as any).isDefault = true;
+    user.addresses = addresses.filter((entry: any) => entry._id !== req.params.addressId);
+    if (wasDefault && user.addresses[0]) user.addresses[0].isDefault = true;
     await user.save();
     res.json({ success: true, data: user.addresses });
   } catch (error) {

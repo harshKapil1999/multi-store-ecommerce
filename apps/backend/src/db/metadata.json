@@ -1,0 +1,767 @@
+{
+  "Billboard": {
+    "table": "billboard",
+    "fields": {
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "categoryId": {
+        "type": "text",
+        "required": false,
+        "default": null
+      },
+      "title": {
+        "type": "text",
+        "required": true
+      },
+      "subtitle": {
+        "type": "text",
+        "required": false
+      },
+      "imageUrl": {
+        "type": "text",
+        "required": true
+      },
+      "ctaText": {
+        "type": "text",
+        "required": false
+      },
+      "ctaLink": {
+        "type": "text",
+        "required": false
+      },
+      "order": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "isActive": {
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Category": {
+    "table": "category",
+    "fields": {
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "name": {
+        "type": "text",
+        "required": true
+      },
+      "slug": {
+        "type": "text",
+        "required": true
+      },
+      "description": {
+        "type": "text",
+        "required": false
+      },
+      "imageUrl": {
+        "type": "text",
+        "required": false
+      },
+      "parentId": {
+        "type": "text",
+        "required": false
+      },
+      "isFeatured": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "order": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "isActive": {
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
+      "billboards": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "NewsletterSubscriber": {
+    "table": "newsletter_subscriber",
+    "fields": {
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "email": {
+        "type": "text",
+        "required": true
+      },
+      "status": {
+        "type": "text",
+        "required": false,
+        "default": "subscribed",
+        "enum": [
+          "subscribed",
+          "unsubscribed"
+        ]
+      },
+      "consentAt": {
+        "type": "timestamp",
+        "required": true
+      },
+      "source": {
+        "type": "text",
+        "required": false,
+        "default": "storefront_home"
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Order": {
+    "table": "order",
+    "fields": {
+      "checkoutKey": {
+        "type": "text",
+        "required": false
+      },
+      "checkoutFingerprint": {
+        "type": "text",
+        "required": false
+      },
+      "paymentCreationStartedAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "inventoryStatus": {
+        "type": "text",
+        "required": false,
+        "default": "uncommitted",
+        "enum": [
+          "uncommitted",
+          "committed",
+          "released",
+          "review"
+        ]
+      },
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "orderNumber": {
+        "type": "text",
+        "required": true
+      },
+      "customer": {
+        "type": "jsonb"
+      },
+      "items": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "subtotal": {
+        "type": "doublePrecision",
+        "required": true
+      },
+      "tax": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "shipping": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "discount": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "total": {
+        "type": "doublePrecision",
+        "required": true
+      },
+      "status": {
+        "type": "text",
+        "required": false,
+        "default": "pending",
+        "enum": [
+          "pending",
+          "confirmed",
+          "processing",
+          "shipped",
+          "delivered",
+          "cancelled",
+          "refunded"
+        ]
+      },
+      "paymentStatus": {
+        "type": "text",
+        "required": false,
+        "default": "pending",
+        "enum": [
+          "pending",
+          "paid",
+          "failed",
+          "refunded"
+        ]
+      },
+      "paymentMethod": {
+        "type": "text",
+        "required": false
+      },
+      "transactionId": {
+        "type": "text",
+        "required": false
+      },
+      "razorpayOrderId": {
+        "type": "text",
+        "required": false
+      },
+      "shippingAddress": {
+        "type": "jsonb"
+      },
+      "billingAddress": {
+        "type": "jsonb"
+      },
+      "fulfillment": {
+        "type": "jsonb"
+      },
+      "statusHistory": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "notes": {
+        "type": "text",
+        "required": false
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Otp": {
+    "table": "otp",
+    "fields": {
+      "attempts": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "email": {
+        "type": "text",
+        "required": true
+      },
+      "otp": {
+        "type": "text",
+        "required": true
+      },
+      "type": {
+        "type": "text",
+        "required": false,
+        "default": "login",
+        "enum": [
+          "login",
+          "register",
+          "order_confirmation"
+        ]
+      },
+      "expiresAt": {
+        "type": "timestamp",
+        "required": true
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Page": {
+    "table": "page",
+    "fields": {
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "title": {
+        "type": "text",
+        "required": true
+      },
+      "slug": {
+        "type": "text",
+        "required": true
+      },
+      "description": {
+        "type": "text",
+        "required": false
+      },
+      "metaTitle": {
+        "type": "text",
+        "required": false
+      },
+      "metaDescription": {
+        "type": "text",
+        "required": false
+      },
+      "isPublished": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "isHomePage": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "sections": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Product": {
+    "table": "product",
+    "fields": {
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "name": {
+        "type": "text",
+        "required": true
+      },
+      "slug": {
+        "type": "text",
+        "required": true
+      },
+      "description": {
+        "type": "text",
+        "required": false,
+        "default": ""
+      },
+      "featuredImage": {
+        "type": "text",
+        "required": true
+      },
+      "mediaGallery": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "mrp": {
+        "type": "doublePrecision",
+        "required": true
+      },
+      "sellingPrice": {
+        "type": "doublePrecision",
+        "required": true
+      },
+      "categoryId": {
+        "type": "text",
+        "required": true
+      },
+      "attributes": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "isFeatured": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "sku": {
+        "type": "text",
+        "required": false
+      },
+      "isActive": {
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
+      "stock": {
+        "type": "doublePrecision",
+        "required": true,
+        "default": 0
+      },
+      "hasVariants": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "variantOptions": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Store": {
+    "table": "store",
+    "fields": {
+      "name": {
+        "type": "text",
+        "required": true
+      },
+      "slug": {
+        "type": "text",
+        "required": true
+      },
+      "domain": {
+        "type": "text",
+        "required": false
+      },
+      "description": {
+        "type": "text",
+        "required": false
+      },
+      "logo": {
+        "type": "text",
+        "required": false
+      },
+      "owner": {
+        "type": "text",
+        "required": false
+      },
+      "commerce": {
+        "type": "jsonb"
+      },
+      "seo": {
+        "type": "jsonb"
+      },
+      "theme": {
+        "type": "jsonb"
+      },
+      "navigation": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "footer": {
+        "type": "jsonb"
+      },
+      "topBar": {
+        "type": "jsonb"
+      },
+      "isActive": {
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
+      "homeBillboards": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "homeSections": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "Transaction": {
+    "table": "transaction",
+    "fields": {
+      "refundError": {
+        "type": "text",
+        "required": false
+      },
+      "refundPending": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "refundId": {
+        "type": "text",
+        "required": false
+      },
+      "orderId": {
+        "type": "text",
+        "required": true
+      },
+      "storeId": {
+        "type": "text",
+        "required": true
+      },
+      "razorpayOrderId": {
+        "type": "text",
+        "required": true
+      },
+      "razorpayPaymentId": {
+        "type": "text",
+        "required": false
+      },
+      "razorpaySignature": {
+        "type": "text",
+        "required": false
+      },
+      "amount": {
+        "type": "doublePrecision",
+        "required": true
+      },
+      "currency": {
+        "type": "text",
+        "required": true,
+        "default": "INR"
+      },
+      "status": {
+        "type": "text",
+        "required": false,
+        "default": "created",
+        "enum": [
+          "created",
+          "authorized",
+          "captured",
+          "failed",
+          "refunded"
+        ]
+      },
+      "method": {
+        "type": "text",
+        "required": false
+      },
+      "email": {
+        "type": "text",
+        "required": false
+      },
+      "phone": {
+        "type": "text",
+        "required": false
+      },
+      "notes": {
+        "type": "jsonb",
+        "required": false
+      },
+      "errorCode": {
+        "type": "text",
+        "required": false
+      },
+      "errorDescription": {
+        "type": "text",
+        "required": false
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "User": {
+    "table": "user",
+    "fields": {
+      "email": {
+        "type": "text",
+        "required": true
+      },
+      "emailVerified": {
+        "type": "boolean",
+        "required": false,
+        "default": false
+      },
+      "password": {
+        "type": "text",
+        "required": true
+      },
+      "name": {
+        "type": "text",
+        "required": true
+      },
+      "role": {
+        "type": "text",
+        "required": false,
+        "default": "customer",
+        "enum": [
+          "customer",
+          "admin",
+          "store_owner"
+        ]
+      },
+      "addresses": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  },
+  "ProductVariant": {
+    "table": "product_variant",
+    "fields": {
+      "productId": {
+        "type": "text",
+        "required": true
+      },
+      "name": {
+        "type": "text",
+        "required": true
+      },
+      "sku": {
+        "type": "text",
+        "required": true
+      },
+      "price": {
+        "type": "doublePrecision",
+        "required": true
+      },
+      "compareAtPrice": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "stock": {
+        "type": "doublePrecision",
+        "required": true,
+        "default": 0
+      },
+      "images": {
+        "type": "jsonb",
+        "required": false,
+        "default": []
+      },
+      "featuredImageIndex": {
+        "type": "doublePrecision",
+        "required": false,
+        "default": 0
+      },
+      "attributes": {
+        "type": "jsonb",
+        "required": true
+      },
+      "isActive": {
+        "type": "boolean",
+        "required": false,
+        "default": true
+      },
+      "_id": {
+        "type": "text",
+        "required": true
+      },
+      "createdAt": {
+        "type": "timestamp",
+        "required": false
+      },
+      "updatedAt": {
+        "type": "timestamp",
+        "required": false
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import mongoose from 'mongoose';
+import { newId, isValidId } from '../db/repository';
 import { Page } from '../models/page.model';
 import type { CreatePageInput, UpdatePageInput, AddPageSectionInput, UpdatePageSectionInput } from '@repo/types';
 import sanitizeHtml from 'sanitize-html';
@@ -312,7 +312,7 @@ export const addSection = async (req: Request, res: Response) => {
 
     page.sections.push({
       ...sectionData,
-      _id: new mongoose.Types.ObjectId().toString(),
+      _id: newId(),
       order: sectionData.order ?? (maxOrder + 1),
       isVisible: sectionData.isVisible ?? true,
     } as any);
@@ -365,7 +365,7 @@ export const updateSection = async (req: Request, res: Response) => {
 
     // Update section
     page.sections[sectionIndex] = {
-      ...(page.sections[sectionIndex] as any).toObject(),
+      ...page.sections[sectionIndex],
       ...sectionData,
     } as any;
 

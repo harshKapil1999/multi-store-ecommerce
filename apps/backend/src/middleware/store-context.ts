@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { isValidObjectId } from 'mongoose';
+import { isValidId as isValidObjectId } from '../db/repository';
 import { Store } from '../models/store.model';
 import { AppError } from './error-handler';
 import type { AuthRequest } from './auth';

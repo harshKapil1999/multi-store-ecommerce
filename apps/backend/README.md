@@ -5,7 +5,7 @@ RESTful API server for the multi-store e-commerce platform.
 ## Features
 
 - Multi-tenant architecture
-- MongoDB with Mongoose
+- PostgreSQL with Drizzle and Redis caching
 - JWT authentication
 - Role-based authorization
 - Express validation
@@ -34,7 +34,8 @@ Create `.env`:
 ```env
 NODE_ENV=development
 PORT=4000
-MONGODB_URI=mongodb://localhost:27017/ecommerce
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ecommerce
+REDIS_URL=redis://localhost:6379
 JWT_SECRET=your-super-secret-jwt-key
 R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=your-r2-access-key-id
@@ -46,3 +47,5 @@ R2_PUBLIC_URL=https://your-public-r2-url.com
 ## API Documentation
 
 See main README for complete API documentation.
+
+See [migration and shipping setup](../../docs/POSTGRES-REDIS-SHIPPING.md).

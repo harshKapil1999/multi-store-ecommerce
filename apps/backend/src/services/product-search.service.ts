@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js';
-import type { FilterQuery } from 'mongoose';
+import type { FilterQuery } from '../db/repository';
 import { Product, IProduct } from '../models/product.model';
 
 type SearchableProduct = {

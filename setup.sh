@@ -14,17 +14,8 @@ fi
 echo "✅ pnpm is installed"
 echo ""
 
-# Check if MongoDB is running
-if ! command -v mongod &> /dev/null
-then
-    echo "⚠️  MongoDB is not installed or not in PATH"
-    echo "   Install MongoDB from: https://www.mongodb.com/try/download/community"
-    echo "   Or use MongoDB Atlas: https://www.mongodb.com/cloud/atlas"
-    echo ""
-else
-    echo "✅ MongoDB is installed"
-    echo ""
-fi
+echo "Configure PostgreSQL (DATABASE_URL) and Redis (REDIS_URL) in apps/backend/.env."
+echo "After building, run pnpm --filter @repo/backend db:migrate."
 
 # Install dependencies
 echo "📦 Installing dependencies..."
@@ -68,8 +59,8 @@ echo ""
 echo "✨ Setup complete!"
 echo ""
 echo "Next steps:"
-echo "1. Update apps/backend/.env with your MongoDB URI and secrets"
-echo "2. Start MongoDB if running locally"
+echo "1. Update apps/backend/.env with your PostgreSQL URL and secrets"
+echo "2. Run pnpm --filter @repo/backend db:migrate"
 echo "3. Run 'pnpm dev' to start all applications"
 echo ""
 echo "Applications will run on:"

@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import { hasBlockingShipment } from '../services/shipment-state.service';
+import { startSession } from '../config/database';
 import { z } from 'zod';
 import { changeInventory } from '../services/inventory.service';
 import { Request, Response, NextFunction } from 'express';
@@ -270,7 +271,7 @@ async function handlePaymentCaptured(payment: any) {
 }
 
 async function handlePaymentFailed(payment: any) {
-    const session = await mongoose.startSession();
+    const session = await startSession();
     try {
         await session.withTransaction(async () => {
             const transaction = await Transaction.findOneAndUpdate({ razorpayOrderId: payment.order_id, status: { $in: ['created', 'failed'] } }, { $set: { status: 'failed', errorCode: payment.error_code, errorDescription: payment.error_description } }, { new: true, session });
@@ -289,7 +290,7 @@ async function handleRefundCreated(refund: any) {
         await Transaction.updateOne({ _id: transaction._id }, { $set: { refundPending: !['failed', 'processed'].includes(refund.status), refundId: refund.id } });
         return;
     }
-    const session = await mongoose.startSession();
+    const session = await startSession();
     let updatedOrder: InstanceType<typeof Order> | null = null;
     try {
         await session.withTransaction(async () => {
@@ -298,7 +299,7 @@ async function handleRefundCreated(refund: any) {
             if (!changed.modifiedCount) return;
             const currentOrder = await Order.findById(transaction.orderId).session(session);
             if (!currentOrder) throw new AppError('Order not found', 404);
-            const release = currentOrder.inventoryStatus === 'committed' && ['pending', 'confirmed', 'processing'].includes(currentOrder.status);
+            const release = !(await hasBlockingShipment(currentOrder._id, session)) && currentOrder.inventoryStatus === 'committed' && ['pending', 'confirmed', 'processing'].includes(currentOrder.status);
             if (release) await changeInventory(currentOrder.items, currentOrder.storeId, 1, session);
             updatedOrder = await Order.findByIdAndUpdate(transaction.orderId, { $set: { status: 'refunded', paymentStatus: 'refunded', ...(release ? {inventoryStatus: 'released'} : {}) }, $push: { statusHistory: { status: 'refunded', at: new Date(), note: 'Razorpay confirmed the full refund.' } } }, { session, new: true });
         });

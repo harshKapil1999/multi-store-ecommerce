@@ -1,4 +1,5 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { createRepository, Entity } from '../db/repository';
+import { PageTable } from '../db/schema';
 
 // Page Section Types
 export type SectionType = 'hero' | 'billboard' | 'featured_products' | 'featured_categories' | 'product_grid' | 'category_grid' | 'text_content' | 'custom_html';
@@ -36,7 +37,7 @@ export interface IPageSection {
   padding?: string;
 }
 
-export interface IPage extends Document {
+export interface IPage extends Entity {
   storeId: string;
   title: string;
   slug: string;
@@ -50,110 +51,5 @@ export interface IPage extends Document {
   updatedAt: Date;
 }
 
-const pageSectionSchema = new Schema<IPageSection>({
-  type: {
-    type: String,
-    required: true,
-    enum: ['hero', 'billboard', 'featured_products', 'featured_categories', 'product_grid', 'category_grid', 'text_content', 'custom_html'],
-  },
-  title: String,
-  order: {
-    type: Number,
-    required: true,
-    default: 0,
-  },
-  isVisible: {
-    type: Boolean,
-    default: true,
-  },
-  
-  // Billboard Section
-  billboardId: String,
-  
-  // Featured Products Section
-  productIds: [String],
-  productsLimit: Number,
-  showFeaturedOnly: Boolean,
-  categoryFilter: String,
-  
-  // Featured Categories Section
-  categoryIds: [String],
-  categoriesLimit: Number,
-  
-  // Text Content Section
-  content: String,
-  
-  // Custom HTML Section
-  html: String,
-  
-  // Layout options
-  layout: {
-    type: String,
-    enum: ['grid', 'carousel', 'list', 'masonry'],
-    default: 'grid',
-  },
-  columns: {
-    type: Number,
-    default: 3,
-  },
-  backgroundColor: String,
-  padding: String,
-}, { _id: true });
 
-const pageSchema = new Schema<IPage>(
-  {
-    storeId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    title: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    slug: {
-      type: String,
-      required: true,
-      lowercase: true,
-      trim: true,
-    },
-    description: String,
-    metaTitle: String,
-    metaDescription: String,
-    isPublished: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    isHomePage: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
-    sections: [pageSectionSchema],
-  },
-  {
-    timestamps: true,
-  }
-);
-
-// Compound index for store and slug (unique per store)
-pageSchema.index({ storeId: 1, slug: 1 }, { unique: true });
-
-// Index for finding home pages
-pageSchema.index({ storeId: 1, isHomePage: 1 });
-
-// Ensure only one home page per store
-pageSchema.pre('save', async function (next) {
-  if (this.isHomePage && this.isModified('isHomePage')) {
-    // Unset other home pages for this store
-    await Page.updateMany(
-      { storeId: this.storeId, _id: { $ne: this._id } },
-      { $set: { isHomePage: false } }
-    );
-  }
-  next();
-});
-
-export const Page = mongoose.model<IPage>('Page', pageSchema);
+export const Page = createRepository<IPage>('Page', PageTable);

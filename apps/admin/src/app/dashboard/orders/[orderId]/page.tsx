@@ -8,6 +8,7 @@ import { ArrowLeft, Package, User, MapPin, CreditCard, Loader2, Truck, Printer }
 import { ORDER_TRANSITIONS } from '@repo/types';
 import type { OrderStatus, OrderItem, Order } from '@repo/types';
 import Image from 'next/image';
+import { ShiprocketPanel } from '@/components/orders/shiprocket-panel';
 
 const statusColors: Record<OrderStatus, string> = {
   pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
@@ -129,6 +130,7 @@ export default function OrderDetailPage({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left column - Main content */}
         <div className="md:col-span-2 space-y-6">
+          <ShiprocketPanel orderId={orderId} />
           {/* Order Items */}
           <Card className="p-6">
             <div className="flex items-center gap-2 mb-4">

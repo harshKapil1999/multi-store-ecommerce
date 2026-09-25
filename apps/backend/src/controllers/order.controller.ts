@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import { hasBlockingShipment } from '../services/shipment-state.service';
+import { startSession } from '../config/database';
 import { createHash } from 'node:crypto';
 import { checkoutSchema } from '../validators/checkout.schema';
 import { changeInventory } from '../services/inventory.service';
@@ -154,7 +155,7 @@ export const createOrder = async (req: AuthRequest, res: Response, next: NextFun
     if (!store) throw new AppError('Store not found or inactive', 404);
     const settings = { ...DEFAULT_COMMERCE_SETTINGS, ...store.commerce };
     if (paymentMethod === 'cod' && !settings.codEnabled) throw new AppError('Cash on delivery is unavailable for this store.', 400);
-    const session = await mongoose.startSession();
+    const session = await startSession();
     let order: InstanceType<typeof Order> | undefined;
     try {
       await session.withTransaction(async () => {
@@ -278,11 +279,12 @@ export const updateOrderStatus = async (
       ];
     }
 
-    const session = await mongoose.startSession();
+    const session = await startSession();
     try {
       await session.withTransaction(async () => {
         const current = await Order.findOne({ _id: order._id, status: previousStatus, updatedAt: order.updatedAt }).session(session);
         if (!current) throw new AppError('Order changed. Refresh before saving.', 409);
+        if (status === 'cancelled' && await hasBlockingShipment(current._id, session)) throw new AppError('Cancel and reconcile the Shiprocket shipment before cancelling this order.', 409);
         if (status === 'cancelled' && current.inventoryStatus === 'committed') {
           await changeInventory(current.items, current.storeId, 1, session);
           order.inventoryStatus = 'released';

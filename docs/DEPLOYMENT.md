@@ -1,3 +1,5 @@
+See [current database, caching, shipping and scale-to-zero deployment requirements](POSTGRES-REDIS-SHIPPING.md).
+
 # Production Deployment Runbook
 
 This document describes the production deployment used by Crabtile Shop and
@@ -12,7 +14,7 @@ the procedure for deploying future changes.
 | API | Google Cloud Run | `asia-south1` (Mumbai) | `https://shopbackend.crabtile.com` |
 | API origin | Google Cloud Run | `asia-south1` (Mumbai) | `https://crabtile-shop-backend-jtol2jufsq-el.a.run.app` |
 | API domain proxy | Firebase Hosting | Global edge to Cloud Run | `shopbackend.crabtile.com` |
-| Database | MongoDB Atlas | Managed | Stored in Secret Manager |
+| Database | Neon PostgreSQL | Managed | Stored in Secret Manager |
 | Media | Cloudflare R2 | Managed | Configured in Cloud Run |
 | DNS | Hostinger | Managed | `crabtile.com` zone |
 
@@ -104,7 +106,7 @@ using the project owner account as the Cloud Run runtime identity.
 Production secrets are stored in Google Secret Manager. Current secret names:
 
 ```text
-backend-mongodb-uri
+backend-database-url
 backend-jwt-secret
 backend-session-secret
 backend-r2-access-key-id
@@ -217,7 +219,7 @@ gcloud run services update "$SERVICE" \
 ```
 
 The minimum instance avoids scale-to-zero cold starts; it does not replace
-idempotent payment handling. Razorpay webhooks, MongoDB uniqueness constraints,
+idempotent payment handling. Razorpay webhooks, PostgreSQL uniqueness constraints,
 and the backend payment-finalization claim remain the source of truth when a
 browser disconnects or Razorpay retries an event.
 

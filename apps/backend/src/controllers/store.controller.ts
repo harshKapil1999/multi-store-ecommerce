@@ -1,3 +1,6 @@
+import { sql } from 'drizzle-orm';
+import { getDB } from '../config/database';
+import { OrderTable } from '../db/schema';
 import { Request, Response, NextFunction } from 'express';
 import { Store } from '../models/store.model';
 import { AppError } from '../middleware/error-handler';
@@ -219,7 +222,7 @@ export const getStoreStats = async (req: AuthRequest, res: Response, next: NextF
     const storeId = String(store._id);
     const [products, categories, orders, revenue, reviewOrders] = await Promise.all([
       Product.countDocuments({storeId}), Category.countDocuments({storeId}), Order.countDocuments({storeId}),
-      Order.aggregate([{$match:{storeId, paymentStatus:'paid', status:{$nin:['cancelled','refunded']}}},{$group:{_id:null,total:{$sum:'$total'}}}]),
+      getDB().select({ total: sql<number>`coalesce(sum(${OrderTable.total}), 0)`.mapWith(Number) }).from(OrderTable).where(sql`${OrderTable.storeId} = ${storeId} AND ${OrderTable.paymentStatus} = 'paid' AND ${OrderTable.status} NOT IN ('cancelled', 'refunded')`),
       Order.countDocuments({storeId, inventoryStatus:'review'})
     ]);
     res.json({success:true,data:{products,categories,orders,revenue:revenue[0]?.total || 0,reviewOrders}});

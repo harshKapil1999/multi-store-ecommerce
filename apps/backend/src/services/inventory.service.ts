@@ -1,4 +1,4 @@
-import type { ClientSession } from 'mongoose';
+import type { DatabaseSession as ClientSession } from '../config/database';
 import type { OrderItem } from '@repo/types';
 import { Product } from '../models/product.model';
 import { ProductVariant } from '../models/variant.model';
