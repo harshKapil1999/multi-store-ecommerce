@@ -16,7 +16,11 @@ Set `SHIPROCKET_WEBHOOK_SECRET` to a random secret, then configure Shiprocket Se
 
 To activate shipping after replacing placeholders, run `node scripts/deploy-backend.cjs --configure-shipping`, then deploy the built backend image with `node scripts/deploy-backend.cjs --image <image> --enable-shipping`. Finally configure the webhook URL/token in Shiprocket. The normal database deployment leaves shipping disabled until those credentials are supplied.
 
+For Razorpay live payments, generate a live-mode API key pair and configure a separate live-mode webhook in the Razorpay dashboard. Put `RAZORPAY_KEY_ID` (`rzp_live_…`), `RAZORPAY_KEY_SECRET`, and the live webhook's `RAZORPAY_WEBHOOK_SECRET` in the ignored backend `.env`. Run `node scripts/deploy-backend.cjs --configure-razorpay-live`, then `node scripts/deploy-backend.cjs --image <image> --enable-razorpay-live`. This creates dedicated live secrets in Secret Manager and updates Cloud Run's key ID and secret references together. The webhook endpoint is `https://crabtile-shop-backend-jtol2jufsq-el.a.run.app/api/v1/payment/webhook`; enable `payment.captured`, `order.paid`, `payment.failed`, `refund.created`, `refund.processed`, and `refund.failed`. Check a live transaction in the Razorpay dashboard before shipping its order.
+
 Do not put secrets in frontend variables, Git, URLs, or logs. Cloud Run uses Secret Manager references.
+
+The R2 bucket must allow `https://shopadmin.crabtile.com` as a CORS origin for browser-based product, category, store and billboard uploads. Keep `PUT` and `Content-Type` in the allowed methods and headers. The production bucket was updated with this origin on September 25, 2026.
 
 ## Storage and correctness
 

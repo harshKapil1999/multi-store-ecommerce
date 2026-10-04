@@ -19,7 +19,7 @@ export const usePages = (storeId: string, published?: boolean) => {
     queryKey: [...PAGES_QUERY_KEY, storeId, { published }],
     queryFn: async () => {
       const { data } = await apiClient.get(`/stores/${storeId}/pages/admin`);
-      return data.data;
+      return data.data as Page[];
     },
     enabled: !!storeId,
   });

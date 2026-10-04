@@ -19,7 +19,7 @@ export default function PagesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isGeneratingLegal, setIsGeneratingLegal] = useState(false);
 
-  const pages = Array.isArray(pagesData?.data) ? pagesData.data : [];
+  const pages = Array.isArray(pagesData) ? pagesData : [];
   const stores = Array.isArray(storesData?.data) ? storesData.data : [];
   const selectedStore = stores.find((store: any) => store._id === selectedStoreId);
 
