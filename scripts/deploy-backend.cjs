@@ -47,9 +47,15 @@ try {
     const enableRazorpayLive = flags.includes('--enable-razorpay-live');
     const env = enableRazorpayLive ? backendRequire('dotenv').parse(fs.readFileSync('apps/backend/.env')) : {};
     if (enableRazorpayLive && !/^rzp_live_[A-Za-z0-9]+$/.test(env.RAZORPAY_KEY_ID || '')) throw new Error('Live Razorpay key ID is required');
+    const liveVersion = name => {
+      const version = gc(['secrets', 'versions', 'list', name, '--filter=state=ENABLED', '--sort-by=~createTime', '--limit=1', '--format=value(name)']).split('/').pop();
+      if (!/^\d+$/.test(version || '')) throw new Error(`Configure ${name} before enabling live payments`);
+      return version;
+    };
+    const liveSecrets = enableRazorpayLive ? `,RAZORPAY_KEY_SECRET=backend-razorpay-live-key-secret:${liveVersion('backend-razorpay-live-key-secret')},RAZORPAY_WEBHOOK_SECRET=backend-razorpay-live-webhook-secret:${liveVersion('backend-razorpay-live-webhook-secret')}` : '';
     console.log(gc(['run', 'deploy', service, '--region', region, '--image', image,
       '--min=0', '--min-instances=0', '--cpu-throttling', '--scaling=auto',
-      '--update-secrets=DATABASE_URL=backend-database-url:latest,REDIS_URL=backend-redis-url:latest' + (flags.includes('--enable-shipping') ? ',SHIPROCKET_EMAIL=backend-shiprocket-email:latest,SHIPROCKET_PASSWORD=backend-shiprocket-password:latest,SHIPROCKET_WEBHOOK_SECRET=backend-shipping-webhook-secret:latest' : '') + (enableRazorpayLive ? ',RAZORPAY_KEY_SECRET=backend-razorpay-live-key-secret:latest,RAZORPAY_WEBHOOK_SECRET=backend-razorpay-live-webhook-secret:latest' : ''),
+      '--update-secrets=DATABASE_URL=backend-database-url:latest,REDIS_URL=backend-redis-url:latest' + (flags.includes('--enable-shipping') ? ',SHIPROCKET_EMAIL=backend-shiprocket-email:latest,SHIPROCKET_PASSWORD=backend-shiprocket-password:latest,SHIPROCKET_WEBHOOK_SECRET=backend-shipping-webhook-secret:latest' : '') + liveSecrets,
       '--remove-secrets=MONGODB_URI', '--update-env-vars=DATABASE_POOL_MAX=5,CACHE_NAMESPACE=commerce-production' + (enableRazorpayLive ? `,RAZORPAY_KEY_ID=${env.RAZORPAY_KEY_ID}` : ''),
       '--format=value(status.url)']));
   } else if (!flags.includes('--configure-secrets') && !flags.includes('--configure-shipping') && !flags.includes('--configure-razorpay-live')) {

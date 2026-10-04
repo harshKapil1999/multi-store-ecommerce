@@ -207,19 +207,21 @@ gcloud run deploy "$SERVICE" \
   --quiet
 ```
 
-Keep one warm Mumbai instance for checkout and webhook traffic, while allowing
-Cloud Run to add instances under load:
+Allow the Mumbai backend to scale to zero when idle, while adding instances
+under load:
 
 ```bash
 gcloud run services update "$SERVICE" \
   --project "$PROJECT_ID" \
   --region "$REGION" \
-  --min 1 \
+  --min 0 \
+  --min-instances 0 \
+  --cpu-throttling \
+  --scaling auto \
   --quiet
 ```
 
-The minimum instance avoids scale-to-zero cold starts; it does not replace
-idempotent payment handling. Razorpay webhooks, PostgreSQL uniqueness constraints,
+Idle scaling can introduce cold starts. Razorpay webhooks, PostgreSQL uniqueness constraints,
 and the backend payment-finalization claim remain the source of truth when a
 browser disconnects or Razorpay retries an event.
 

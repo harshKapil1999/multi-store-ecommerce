@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter, type SendMailOptions } from 'nodemailer';
 import dotenv from 'dotenv';
 import path from 'path';
 import { Store } from '../models/store.model';
@@ -17,7 +17,7 @@ const escapeHtml = (value: unknown) =>
     .replace(/'/g, '&#039;');
 
 class MailService {
-  private transporter: nodemailer.Transporter | null = null;
+  private transporter: Transporter | null = null;
   private isConfigured = false;
 
   constructor() {
@@ -70,7 +70,7 @@ class MailService {
     return `${storefrontUrl}/${store.slug}/order-success?orderId=${encodeURIComponent(String(orderData._id))}`;
   }
 
-  private async send(mailOptions: nodemailer.SendMailOptions, fallbackLabel: string) {
+  private async send(mailOptions: SendMailOptions, fallbackLabel: string) {
     if (!this.isConfigured || !this.transporter) {
       console.log(`[Email skipped - SMTP not configured] ${fallbackLabel}`);
       console.log(`To: ${mailOptions.to}`);
