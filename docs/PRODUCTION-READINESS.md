@@ -1,69 +1,48 @@
-# Crabtile release — 6–7 September 2026
+# Production verification — 4 October 2026
 
 ## Deployed applications
 
-- Storefront: https://shop.crabtile.com
-- Admin: https://shopadmin.crabtile.com
-- API: https://shopbackend.crabtile.com
-- Backend revision: `crabtile-shop-backend-00013-thz` (100% traffic).
-- Cloud Build: `13ccb429-123a-4b6b-a580-a31c3f48e4da`.
-- Storefront deployment: `dpl_BgDYE3LZbq6QDsiJPDsjNgqV1uLZ`.
-- Admin deployment: `dpl_kZwUEkFqAmP5oZbwcMjnRKTmTJSm`.
+- Storefront: https://shop.crabtile.com — Vercel deployment `dpl_3rFsqtyLAa1UTQkChpaqM63HgZUM`, deployed 4 October, Next.js 16.3.8.
+- Admin: https://shopadmin.crabtile.com — Vercel deployment `dpl_FL33AaWnwag7z8YFCnTu3iVAYg1S`, deployed 4 October, Next.js 16.3.8.
+- Backend: https://crabtile-shop-backend-jtol2jufsq-el.a.run.app — revision `crabtile-shop-backend-00015-w2w`, Ready, 100% traffic. Image tag `release-20261004-patched`, built by successful Cloud Build `7832ac1b-8ef9-4350-91ba-5353a190a68e`.
+- Migration commit: `fe9be58`; admin draft-list correction: `561ad23`; production dependency updates: `6d8d2b6`, all pushed to GitHub main.
 
-## Completed work
+The storefront, admin and backend health endpoint were reachable on 4 October. The PostgreSQL migration replaced the dummy MongoDB commerce data. Earlier MongoDB order IDs, release checks and rollback-data instructions from the September release no longer describe the current database. Historical dummy-data preparation scripts are retired.
 
-Email OTPs use cryptographic generation, hashed storage, bounded attempts, an atomic one-time consume operation, and a per-email resend delay. Registration cannot assign privileged roles. Customer tokens use the current database identity; customer email changes require fresh verification. Upload endpoints require store-manager access. Public reads exclude inactive stores and draft catalog records. Page writes validate allowed fields and sanitize HTML. Tenant checks protect catalog references and customer/order access. Personal API responses are not cacheable. Admin authentication checks verified Firebase email and the configured allowlist; the admin backend bridge checks mutation origin. Dependencies were updated and the production audit reports zero known advisories as of this release.
+## Database, cache and idle scaling
 
-Checkout validates Indian delivery details and verified customer identity, calculates price and shipping from database records, requires valid variants, and creates one order per checkout key. Transactions coordinate inventory with COD orders and captured payments. Repeated captures, delayed failures, order retries and concurrent purchases cannot debit stock twice or oversell available stock. Captured payments with unavailable inventory are recorded as paid and flagged for manual review, preventing silent loss of payment evidence. Refunds reconcile with Razorpay and are full-refund only in the admin. Undispatched inventory is restored once on cancellation or full refund.
+The backend uses PostgreSQL through Drizzle, versioned SQL migrations, relational constraints and serializable inventory/order transactions. Neon suspend-after-five-minutes was verified during migration. The application keeps no minimum database connections, closes idle connections after ten seconds and makes no database query from `/health`.
 
-The admin now has complete paid-order revenue totals, paginated products and transactions, customer history, addresses, payment references, fulfillment notes, tracking details, and guarded order transitions. Category ordering and homepage section order follow saved admin settings. Sections and selected categories/products can be added, removed and reordered. Store settings include contact, shipping, return/refund windows, SEO, grievance contact and optional tax registration fields. Stores containing records must be deactivated instead of deleted.
+Cloud Run's final deployed revision was inspected on 4 October: service and revision minimum instances are zero (default), automatic scaling is enabled, and CPU throttling is enabled. This permits idle scale-to-zero; traffic, open requests or external uptime requests can delay idleness. Catalog MISS then HIT responses were verified against the production Redis cache after the new deployment. Cookie-bearing catalog responses bypass shared caching and carry `private, no-store`. Authenticated/private responses bypass shared caching. Product writes invalidate catalog caches. PostgreSQL and Redis remain Secret Manager references; no MongoDB connection reference remains.
 
-The storefront has a redesigned Crabtile collection landing page, a simplified Nike homepage, configurable catalog sections, working product/category links, category/product filtering, sort and pagination, account profiles, saved addresses, order history, automatic tracking refresh, receipts and marketing unsubscribe. Removed hardcoded product selectors, duplicate homepage sections, placeholder category copy and unrelated importer text. Existing factual product descriptions still require merchant review before replacing the test catalog.
+See [the deployment runbook](POSTGRES-REDIS-SHIPPING.md) for configuration and integration activation.
 
-Public pages include About, Contact, Terms, Privacy (including purposes of data collection), Shipping, and Returns/Refunds. Defaults use Crabtile in Himachal Pradesh, India. A published CMS page with the corresponding slug overrides its default store policy. SEO includes server-rendered metadata, canonicals, social cards, Product and Breadcrumb structured data, sitemap and robots rules. Account, checkout, cart, wishlist, search and admin surfaces are not intended for indexing. Search engine indexing/ranking is not guaranteed.
+## Verification completed
 
-## Verification
+- Production storefront and admin deployed; Google admin sign-in succeeded.
+- Production email OTP delivery and verification succeeded using the user-approved test mailbox.
+- Storefront product rendering, bag, server-calculated ₹199 checkout and Razorpay **test-mode** mock-bank success completed.
+- QA order `ORD-MUU0M00I-5QL5F` / `6f2224e968a7cbb71f203de2` created one captured transaction `13eaf14248162adc6818a15e` / provider payment `pay_TjtNfXmj6AYeZw`.
+- PostgreSQL confirmed the paid order, committed inventory and stock change from 3 to 2.
+- Admin order details, addresses, payment references and transaction reconciliation displayed the same records.
+- Admin Processing update persisted and appeared in customer tracking. The order was subsequently cancelled, with a QA-only note; PostgreSQL confirmed released inventory and stock restored from 2 to 3. Customer order history also showed the cancellation. No parcel was shipped and no real money was charged.
+- Production product image upload succeeded after the R2 CORS origin was corrected. The uploaded image appeared in the preview.
+- Production admin product creation (inactive), editing, stock adjustment (2 to 4), variant creation, billboard creation (inactive), category editing and draft-page/text-section creation succeeded. A page-list response-shape bug was found and corrected; the deployed admin now displays drafts. Publishing the QA page returned HTTP 200; unpublishing returned HTTP 404.
+- Customer summaries, contact details, addresses, order history and customer receipt detail displayed the QA order consistently. QA products, category and billboard are inactive; the QA page is a draft. The records remain for audit.
+- An inactive QA product and draft page returned 404 publicly. Anonymous order and transaction requests returned 401. Public catalog responses excluded the inactive fixture.
+- All 20 backend integration tests passed against an isolated local PostgreSQL database and a separate Redis test namespace. Coverage includes OTP replay/attempt controls, authorization, order retry idempotency, stock races, captured-payment reconciliation, webhook signatures, refund lifecycle, page consistency and Shiprocket duplicate-request protection. Payment/shipping provider calls in these tests are simulated; this is not live-carrier or live-money validation.
+- All six monorepo builds and lint tasks passed after dependency updates (lint warnings remain). The production dependency audit reports no known vulnerabilities on 4 October. Nodemailer SMTP connection verification and Razorpay test-payment retrieval passed with the updated dependencies.
+- GitHub Commerce checks passed for `6d8d2b6`: [run 37217487826](https://github.com/harshKapil1999/multi-store-ecommerce/actions/runs/37217487826). Deployment-script syntax and diff whitespace checks passed.
+- After fixture cleanup and the final storefront deployment, all 15 sitemap URLs returned HTTP 200, a canonical link and exactly one H1 (zero failures). Health and both production aliases returned HTTP 200; inactive QA products and the draft page remained hidden. The patched admin displayed the QA draft page after reload, and the signed-in storefront retained access to the cancelled order receipt.
 
-- Frozen lockfile installation and monorepo production build passed.
-- Lint passed with zero errors; existing warning debt remains (primarily typing, unused imports and image optimization).
-- 14 isolated MongoDB replica-set integration tests passed. Tests never connect to production or send email.
-- All 24 sitemap pages returned HTTP 200, a canonical link and exactly one H1.
-- Deleted-store route returned 404; anonymous private-order request returned 401.
-- Live OTP delivery to the supplied test mailbox and browser verification passed.
-- Saved address persisted and was selected at checkout.
-- Razorpay **test-mode** payment created one captured transaction and one paid order; product stock changed exactly once.
-- Test order `ORD-MTPSC3TD-GN0EN` / `6a9d5bca17e2954fdcdcf818` completed processing, simulated dispatch and simulated delivery. Customer tracking refreshed automatically with each note and carrier detail. No goods were shipped and no real money was charged.
-- Mobile landing and catalog fit a 390 px viewport; price sorting passed. Closed mobile navigation and collapsed category links are excluded from keyboard/accessibility navigation.
-- Test refund initiation remains blocked: Razorpay returned HTTP 400, `invalid request sent`, through both its SDK and direct documented API. Provider inspection confirmed no refund exists and the payment is still captured. The admin now clears a definitively rejected refund claim and shows the error; uncertain network failures remain pending for reconciliation. Automated refund lifecycle and duplicate-webhook tests pass.
-- The one QA item was restored to stock (4 → 5) in a guarded database transaction. The order/payment evidence remains for audit, with a test-cleanup note.
-- GitHub Actions passed for commit `1d2cce0` ([run](https://github.com/harshKapil1999/multi-store-ecommerce/actions/runs/34049193484)). The workflow now runs installation, lint, build, isolated commerce tests and the production dependency audit on pull requests and main pushes.
-- Test payment reference: `pay_TYkbiCYt0BbSwO`; transaction `6a9d5bcb17e2954fdcdcf82a`.
+Screenshots are stored locally under `.local-backups/production-qa/`, excluded from Git and deployment uploads.
 
-## Store cleanup and recovery
+## Remaining activation and verification
 
-Only the explicitly requested, empty Adidas and Puma stores were removed. Nike's 11 pre-existing orders were preserved. The migration writes a private backup to `.local-backups/` before changing records; backups are excluded from Git, Docker, Vercel and Cloud Build uploads. `scripts/finalize-production.cjs` previews unless `--apply` is supplied. Do not rerun it casually: it resets Nike's launch homepage settings. `scripts/verify-release-order.cjs` verifies only the named QA order. Back up and review any future data migration separately.
+Razorpay's live dashboard currently disables Generate Key until the business website is approved. Website review was attempted with the real storefront URL and a truthful explanation of OTP-only reviewer login; no approved/pending website status was confirmed. Live API keys and a live webhook secret are unavailable. Cloud Run therefore remains on the existing Razorpay test key. Do not describe this deployment as accepting live payments.
 
-Rollback application revisions using `docs/DEPLOYMENT.md`. Do not restore the full database backup over subsequent customer purchases. A data rollback should restore only the specific affected catalog/configuration documents after checking current records.
+Shiprocket remains disabled with inert test placeholders, as requested. Actual API credentials, pickup configuration, KYC and shipping wallet funding are required before real courier rates, shipment creation, AWB, pickup, labels and tracking can be verified.
 
-## Launch inputs still required from the business
+The simulated test payment remains captured. The admin full-refund confirmation is awaiting the user's approval; no refund was submitted. Refund lifecycle and signature handling passed automated integration tests, but a production UI refund has not been completed.
 
-1. Replace the test products, imagery, sizes, stock, descriptions and brand claims with your actual sellable catalog. Confirm MRP, tax treatment, country of origin and manufacturer/importer details where applicable. Receipts are not a substitute for a compliant GST tax invoice when one is required.
-2. Complete the actual correspondence/return address, grievance officer contact and customer-support details in Store settings. The phone was intentionally left blank at your request. The policy defaults need business/legal review against actual operations; this release is not a compliance certification.
-3. Review the configured shipping charge (₹99, free from ₹2,500), COD availability, dispatch (2 business days), delivery (3–7 business days after dispatch), returns (7 days) and refunds (7 business days). These are editable operating commitments, not carrier integrations or guaranteed delivery dates.
-4. Resolve the test refund API rejection with Razorpay and complete a successful provider refund before accepting real orders. Switch Razorpay to live keys only when the merchant account is ready. Test and live webhooks are separate: subscribe to payment.captured, payment.failed, order.paid, refund.created, refund.processed and refund.failed with the matching secret. The existing test custom-domain webhook was updated to include refund lifecycle events. Two existing webhook URLs target this backend; duplicate deliveries are handled idempotently.
-5. Business aliases exist in Hostinger, but SMTP currently authenticates through the existing Gmail configuration. OTP delivery was verified. Configure the business mailbox credentials through Secret Manager, then verify SPF/DKIM/DMARC and sender alignment before volume sending. Do not paste credentials into source or chat.
-6. Verify domain ownership in Google Search Console and submit `/sitemap.xml`. Configure `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` only with the real verification token. Add actual product data before requesting indexing of the final catalog.
-
-## Daily order handling
-
-Review Orders for pending online payments and paid orders needing inventory review. Never dispatch a review order until inventory and payment are reconciled; refund the captured payment if it cannot be fulfilled. Normal orders progress Confirmed → Processing → Shipped → Delivered. Before marking Shipped, enter a real carrier and tracking number; use an HTTPS tracking link. Customer notes are public to that customer and are included in transactional updates. Mark COD delivered only once collection has been confirmed; this marks its payment paid.
-
-Cancel before dispatch to return committed stock once. For online refunds use Transactions → payment → Issue full refund, and wait for provider confirmation. If a refund remains pending after a network error, reconcile in Razorpay before retrying. Partial refunds are handled and reconciled through Razorpay; the admin initiates full refunds only. For shipped returns, inspect the returned goods and adjust stock manually after accepting the return. A refund does not automatically assert that shipped goods have returned to inventory.
-
-Review Cloud Run errors and Razorpay webhook delivery failures. The email transport is best effort for order updates: a persisted order remains authoritative if email fails; there is no durable retry queue in this release. General IP rate limits are per running backend instance; OTP resend and consumption controls persist in MongoDB. Configure monitoring/alerting, database backup retention and a restore drill for your operating requirements before scaling sales. This audit and testing reduce risk; they do not establish that every possible defect or vulnerability is absent.
-
-## Reference documentation
-
-- [Next.js metadata](https://nextjs.org/docs/app/api-reference/functions/generate-metadata)
-- [Razorpay webhooks](https://razorpay.com/docs/webhooks/)
-- [Department of Consumer Affairs consumer protection rules](https://consumeraffairs.nic.in/acts-and-rules/consumer-protection/consumer-protection)
+Production checks exercise the workflows listed above, not every admin operation or edge case. Actual shipping and live payment/refund verification remain pending. Replace QA fixtures with the real sellable catalog before business launch; this release does not invent product or merchant details.
