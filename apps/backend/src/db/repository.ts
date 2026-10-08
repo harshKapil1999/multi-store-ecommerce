@@ -118,8 +118,13 @@ export function createRepository<T extends Entity>(name: keyof typeof metadata, 
         let rows: any[];
         if (this.operation) { const result = await this.operation(this.options); rows = result ? [result] : []; }
         else {
-          let q = (this.options.session?.db || getDB()).select().from(table).where(filter(this.query)).$dynamic();
-          const order = Object.entries(this.ordering).filter(([k]) => k !== 'score').map(([k, direction]) => sql`${field(k)} ${sql.raw(direction === -1 ? 'DESC' : 'ASC')}`);
+          const tokens = this.projection?.split(/\s+/) || [];
+          const include = tokens.filter(k => !/^[+-]/.test(k) && columns[k]);
+          const exclude = new Set(tokens.filter(k => k.startsWith('-')).map(k => k.slice(1)));
+          const selected = Object.fromEntries(Object.entries(columns).filter(([k]) =>
+            (include.length === 0 || k === '_id' || include.includes(k)) && !exclude.has(k)));
+          let q = (this.options.session?.db || getDB()).select(selected).from(table).where(filter(this.query)).$dynamic();
+          const order = Object.entries(this.ordering).filter(([k]) => k !== 'score').map(([k, direction]) => sql`${field(k)} ${sql.raw(direction === -1 ? 'DESC NULLS LAST' : 'ASC NULLS LAST')}`);
           if (order.length) q = q.orderBy(...order);
           if (this.single || this.take !== undefined) q = q.limit(this.single ? 1 : this.take);
           if (this.offset) q = q.offset(this.offset);

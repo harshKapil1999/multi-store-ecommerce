@@ -104,7 +104,8 @@ export const updateStockSchema = z.object({
 export const listProductsQuerySchema = z.object({
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
-  search: z.string().optional(),
+  search: z.string().max(80).optional(),
+  packSize: z.string().trim().min(1).max(80).optional(),
   category: z.string().optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),
@@ -112,7 +113,7 @@ export const listProductsQuerySchema = z.object({
   includeInactive: z.enum(['true', 'false']).optional(),
   sortBy: z.enum(['createdAt', 'name', 'sellingPrice']).optional(),
   sortOrder: z.enum(['asc', 'desc']).optional(),
-});
+}).refine(value => value.minPrice === undefined || value.maxPrice === undefined || value.minPrice <= value.maxPrice, { message: 'Minimum price must not exceed maximum price', path: ['minPrice'] });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;

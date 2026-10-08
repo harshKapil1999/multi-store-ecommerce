@@ -9,6 +9,7 @@ import {
   UpdateProductInput,
   UpdateStockInput,
 } from '../validators/billboard-category-product.schema';
+import { catalogFacets, listPackProducts } from '../services/catalog-facets.service';
 import { searchProducts } from '../services/product-search.service';
 
 export const listProducts = async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -19,6 +20,7 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       limit = 20,
       search,
       category,
+      packSize,
       minPrice,
       maxPrice,
       isFeatured,
@@ -26,6 +28,14 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = req.query;
+
+    if (packSize) {
+      const data = await listPackProducts(storeId, { packSize: String(packSize), category: category as string | undefined,
+        minPrice: minPrice === undefined ? undefined : Number(minPrice), maxPrice: maxPrice === undefined ? undefined : Number(maxPrice),
+        page: Number(page), limit: Number(limit), sortBy: String(sortBy), sortOrder: String(sortOrder), search: search as string | undefined });
+      res.json({ success: true, data });
+      return;
+    }
 
     const query: Record<string, any> = { storeId, ...(!canReadDrafts(req) ? { isActive: true } : {}) };
 
@@ -81,7 +91,7 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .sort({ [sortBy as string]: sortOrder === 'asc' ? 1 : -1 })
+        .sort({ [sortBy as string]: sortOrder === 'asc' ? 1 : -1, _id: sortOrder === 'asc' ? 1 : -1 })
         .limit(Math.min(100, Math.max(1, Math.floor(Number(limit) || 10))))
         .skip((Number(page) - 1) * Number(limit)),
       Product.countDocuments(query),
@@ -100,6 +110,12 @@ export const listProducts = async (req: AuthRequest, res: Response, next: NextFu
   } catch (error) {
     next(error);
   }
+};
+
+export const getCatalogFacets = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    res.json({ success: true, data: await catalogFacets(req.params.storeId, req.query.category as string | undefined, req.query.packSize as string | undefined) });
+  } catch (error) { next(error); }
 };
 
 export const getSearchSuggestions = async (

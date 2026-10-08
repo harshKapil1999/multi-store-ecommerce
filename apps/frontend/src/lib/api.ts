@@ -1,4 +1,5 @@
 import { useAuth } from './auth-store';
+import { cache } from 'react';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export async function fetcher<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -34,8 +35,11 @@ export async function fetcher<T>(endpoint: string, options: RequestInit = {}): P
     return data.data || data;
 }
 
+// React cache only deduplicates this render's server requests. It does not retain
+// account data or stale catalog responses across users or requests.
+const get = cache((endpoint: string) => fetcher<unknown>(endpoint, { method: 'GET' }));
 export const api = {
-    get: <T>(endpoint: string) => fetcher<T>(endpoint, { method: 'GET' }),
+    get: <T>(endpoint: string) => get(endpoint) as Promise<T>,
     post: <T>(endpoint: string, body: any) =>
         fetcher<T>(endpoint, { method: 'POST', body: JSON.stringify(body) }),
     put: <T>(endpoint: string, body: any) =>

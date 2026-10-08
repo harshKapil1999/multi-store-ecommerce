@@ -238,6 +238,11 @@ test('Redis caches only public catalog, invalidates on writes, and survives cach
   await Product.updateOne({_id:product._id},{$set:{name:'Updated cached product'}});
   const fresh=await request(app).get(url);assert.equal(fresh.headers['x-cache'],'MISS');assert.equal(fresh.body.data.data.find(p=>p._id===product._id).name,'Updated cached product');
   const privateRead=await request(app).get(url).set('Authorization',`Bearer ${token}`);assert.equal(privateRead.headers['x-cache'],undefined);
+  const cookieRead=await request(app).get(url).set('Cookie','qa=1');assert.equal(cookieRead.headers['x-cache'],undefined);
+  const lookup=await cache.catalogLookup('inflight-test');
+  await cache.invalidateCatalog();await cache.catalogStore('inflight-test',lookup.generation,'stale');
+  assert.equal((await cache.catalogLookup('inflight-test')).cached,null);
+
   const {getDB}=require('../dist/config/database'),original=getDB().execute;
   getDB().execute=()=>{throw Error('health must not query DB')};
   try {assert.equal((await request(app).get('/health')).status,200)}finally{getDB().execute=original;}
@@ -260,4 +265,27 @@ test('SQL catalog relationships, full-text search and customer summaries preserv
  assert.equal(customers.status,200,JSON.stringify(customers.body));assert.ok(customers.body.data.total>=1);assert.equal(typeof customers.body.data.data[0].totalSpent,'number');
  const stats=await request(app).get(`/api/v1/stores/${store._id}/stats`).set('Authorization',`Bearer ${ownerToken}`);
  assert.equal(stats.status,200,JSON.stringify(stats.body));
+});
+
+test('catalog facets and pack filters use active variants, correct prices, boundaries and pagination', async()=>{
+ const {ProductVariant}=require('../dist/models/variant.model');
+ const s=await Store.create({name:'Pack catalog',slug:'pack-catalog',isActive:true});
+ const c=await Category.create({storeId:s._id,name:'Tea',slug:'tea',isActive:true});
+ const make=async(name,price,active=true)=>Product.create({storeId:s._id,name,slug:name.toLowerCase(),featuredImage:'https://example.test/tea.jpg',mrp:price,sellingPrice:price,stock:2,categoryId:c._id,isActive:active,hasVariants:true});
+ const a=await make('Alpha',249),b=await make('Beta',349),hidden=await make('Hidden',1,false);
+ const variant=(p,size,price,active=true)=>ProductVariant.create({productId:p._id,name:size,sku:`${p._id}-${size}-${price}`,price,stock:2,attributes:{'Pack weight':size},isActive:active});
+ await variant(a,'100 g',249);await variant(a,'250 g',599);await variant(a,'250 g',1,false);
+ await variant(b,'100 g',349);await variant(b,'250 g',799);await variant(hidden,'1000 g',1);
+ const base=`/api/v1/stores/${s._id}/products`;
+ const facets=(await request(app).get(base+'/facets')).body.data;
+ assert.deepEqual(facets.price,{min:249,max:349});assert.deepEqual(facets.packSizes,['100 g','250 g']);
+ assert.deepEqual((await request(app).get(base+'/facets?packSize=250%20g')).body.data.price,{min:599,max:799});
+ const selected=(await request(app).get(base+'?packSize=250%20g&minPrice=599&maxPrice=599')).body.data;
+ assert.equal(selected.total,1);assert.equal(selected.data[0]._id,a._id);assert.equal(selected.data[0].catalogPrice,599);assert.equal(selected.data[0].catalogPackSize,'250 g');
+ const next=(await request(app).get(base+'?packSize=250%20g&sortBy=sellingPrice&sortOrder=asc&limit=1&page=2')).body.data;
+ assert.equal(next.total,2);assert.equal(next.data[0]._id,b._id);
+ const empty=(await request(app).get(base+'?packSize=250%20g&page=10')).body.data;assert.equal(empty.total,2);assert.deepEqual(empty.data,[]);
+ assert.equal((await request(app).get(base+'?minPrice=300&maxPrice=100')).status,400);
+ assert.equal((await request(app).get(base+'?packSize=1000%20g')).body.data.total,0);
+ assert.equal((await request(app).get(base+'?maxPrice=249')).body.data.total,1);
 });

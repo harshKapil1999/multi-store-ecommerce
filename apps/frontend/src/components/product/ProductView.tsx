@@ -9,10 +9,11 @@ interface ProductViewProps {
   product: Product;
   variants: ProductVariant[];
   categoryName: string;
+  initialPackSize?: string;
 }
 
-export function ProductView({ product, variants, categoryName }: ProductViewProps) {
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+export function ProductView({ product, variants, categoryName, initialPackSize }: ProductViewProps) {
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(() => variants.find(v => v.isActive && v.attributes['Pack weight'] === initialPackSize) || variants.find(v => v.isActive && v.stock > 0) || variants.find(v => v.isActive) || null);
 
   // Determine active images: Variant images -> Product featured + gallery
   const sortedProductMedia = [...(product.mediaGallery || [])].sort((a, b) => a.order - b.order);

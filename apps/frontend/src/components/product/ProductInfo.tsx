@@ -65,6 +65,7 @@ export function ProductInfo({
       {/* Variant Selector */}
       {product.hasVariants && (
         <VariantSelector
+          initialVariant={selectedVariant}
           product={product}
           variants={variants}
           onVariantSelect={onVariantSelect}
