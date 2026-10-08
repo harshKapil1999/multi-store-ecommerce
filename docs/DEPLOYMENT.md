@@ -1,4 +1,4 @@
-See [current database, caching, shipping and scale-to-zero deployment requirements](POSTGRES-REDIS-SHIPPING.md).
+See [current database, caching, shipping and scale-to-zero deployment requirements](POSTGRES-REDIS-SHIPPING.md) and the [Singapore performance release](PERFORMANCE-2026-10-08.md).
 
 # Production Deployment Runbook
 
@@ -9,12 +9,13 @@ the procedure for deploying future changes.
 
 | Component | Platform | Region or edge | Production address |
 | --- | --- | --- | --- |
-| Storefront | Vercel | Global edge | `https://shop.crabtile.com` |
-| Admin | Vercel | Global edge | `https://shopadmin.crabtile.com` |
-| API | Google Cloud Run | `asia-south1` (Mumbai) | `https://shopbackend.crabtile.com` |
-| API origin | Google Cloud Run | `asia-south1` (Mumbai) | `https://crabtile-shop-backend-jtol2jufsq-el.a.run.app` |
+| Storefront | Vercel | `sin1` functions, global assets | `https://shop.crabtile.com` |
+| Admin | Vercel | `sin1` functions, global assets | `https://shopadmin.crabtile.com` |
+| API | Google Cloud Run | `asia-southeast1` (Singapore) | `https://shopbackend.crabtile.com` |
+| API origin | Google Cloud Run | `asia-southeast1` (Singapore) | `https://crabtile-shop-backend-jtol2jufsq-as.a.run.app` |
 | API domain proxy | Firebase Hosting | Global edge to Cloud Run | `shopbackend.crabtile.com` |
-| Database | Neon PostgreSQL | Managed | Stored in Secret Manager |
+| Database | Neon PostgreSQL | AWS Singapore `ap-southeast-1` | Stored in Secret Manager |
+| Cache | Redis Cloud Free | AWS Singapore `ap-southeast-1` | Stored in Secret Manager |
 | Media | Cloudflare R2 | Managed | Configured in Cloud Run |
 | DNS | Hostinger | Managed | `crabtile.com` zone |
 
@@ -30,10 +31,10 @@ Cloud Run service:
 crabtile-shop-backend
 ```
 
-Direct Cloud Run domain mappings are not supported in `asia-south1`, so
 Firebase Hosting owns the backend certificate and rewrites requests to the
-Cloud Run service in Mumbai. Do not remove the Firebase Hosting site while the
-custom backend domain is in use.
+Cloud Run service in Singapore. The previous Mumbai origin remains idle with
+minimum 0 for old URLs/callbacks. Do not remove the Firebase Hosting site while
+the custom backend domain is in use.
 
 ## Required tools
 
@@ -76,7 +77,7 @@ The following APIs and Docker repository must exist once per project:
 
 ```bash
 PROJECT_ID=project-919e6199-4ea0-4c25-bb6
-REGION=asia-south1
+REGION=asia-south1 # Artifact Registry location; runtime is Singapore
 REPOSITORY=cloud-run-source-deploy
 
 gcloud services enable \
@@ -189,16 +190,17 @@ The checked-in `cloudbuild.backend.yaml` builds the monorepo with
 
 ```bash
 PROJECT_ID=project-919e6199-4ea0-4c25-bb6
-REGION=asia-south1
+REGION=asia-southeast1
+ARTIFACT_REGION=asia-south1
 REPOSITORY=cloud-run-source-deploy
 SERVICE=crabtile-shop-backend
 TAG="$(git rev-parse --short HEAD)-$(date +%Y%m%d%H%M%S)"
-IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:$TAG"
+IMAGE="$ARTIFACT_REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/$SERVICE:$TAG"
 
 gcloud builds submit . \
   --project "$PROJECT_ID" \
   --config cloudbuild.backend.yaml \
-  --substitutions "_REGION=$REGION,_REPOSITORY=$REPOSITORY,_SERVICE=$SERVICE,_TAG=$TAG"
+  --substitutions "_REGION=$ARTIFACT_REGION,_REPOSITORY=$REPOSITORY,_SERVICE=$SERVICE,_TAG=$TAG"
 
 gcloud run deploy "$SERVICE" \
   --project "$PROJECT_ID" \
@@ -207,7 +209,7 @@ gcloud run deploy "$SERVICE" \
   --quiet
 ```
 
-Allow the Mumbai backend to scale to zero when idle, while adding instances
+Allow the Singapore backend to scale to zero when idle, while adding instances
 under load:
 
 ```bash
@@ -242,7 +244,7 @@ Verify both the Cloud Run origin and custom domain:
 
 ```bash
 curl --fail --show-error \
-  https://crabtile-shop-backend-jtol2jufsq-el.a.run.app/health
+  https://crabtile-shop-backend-jtol2jufsq-as.a.run.app/health
 
 curl --fail --show-error \
   "https://shopbackend.crabtile.com/health?probe=$(date +%s)"

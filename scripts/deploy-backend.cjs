@@ -7,7 +7,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const backendRequire = createRequire(path.resolve('apps/backend/package.json'));
 const project = 'project-919e6199-4ea0-4c25-bb6';
-const region = 'asia-south1';
+const region = process.env.CLOUD_RUN_REGION || 'asia-southeast1';
 const service = 'crabtile-shop-backend';
 const runtime = `crabtile-backend-runtime@${project}.iam.gserviceaccount.com`;
 const gc = args => execFileSync('gcloud', [...args, '--project', project, '--quiet'], { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf8' }).trim();
@@ -43,7 +43,7 @@ try {
   const imageIndex = flags.indexOf('--image');
   if (imageIndex >= 0) {
     const image = flags[imageIndex + 1];
-    if (!image?.startsWith(`${region}-docker.pkg.dev/${project}/`)) throw new Error('Provide a built image from this project');
+    if (!['asia-south1', 'asia-southeast1'].some(location => image?.startsWith(`${location}-docker.pkg.dev/${project}/`))) throw new Error('Provide a built image from this project');
     const enableRazorpayLive = flags.includes('--enable-razorpay-live');
     const env = enableRazorpayLive ? backendRequire('dotenv').parse(fs.readFileSync('apps/backend/.env')) : {};
     if (enableRazorpayLive && !/^rzp_live_[A-Za-z0-9]+$/.test(env.RAZORPAY_KEY_ID || '')) throw new Error('Live Razorpay key ID is required');

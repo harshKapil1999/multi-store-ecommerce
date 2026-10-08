@@ -174,6 +174,9 @@ export const ProductTable = pgTable('product', {
   uniqueIndex('product_idx_5').on(t.storeId, t.slug),
   check('product_stock_nonnegative', sql`${t.stock} >= 0`),
   index('product_catalog_idx').on(t.storeId, t.isActive, t.categoryId, t.createdAt),
+  index('product_store_newest_idx').on(t.storeId, t.isActive, t.createdAt.desc(), t._id.desc()),
+  index('product_store_price_idx').on(t.storeId, t.isActive, t.sellingPrice, t._id),
+  index('product_category_price_idx').on(t.storeId, t.isActive, t.categoryId, t.sellingPrice, t._id),
   index('product_search_idx').using('gin', sql`to_tsvector('simple', coalesce(${t.name}, '') || ' ' || coalesce(${t.description}, ''))`),
   check('product_mrp_nonnegative', sql`${t.mrp} >= 0`),
   check('product_sellingPrice_nonnegative', sql`${t.sellingPrice} >= 0`),
@@ -269,6 +272,7 @@ export const ProductVariantTable = pgTable('product_variant', {
   index('product_variant_idx_0').on(t.productId),
   uniqueIndex('product_variant_idx_1').on(t.sku),
   index('product_variant_idx_2').on(t.productId, t.attributes),
+  index('product_variant_pack_price_idx').on(t.productId, sql`(${t.attributes}->>'Pack weight')`, t.price).where(sql`${t.isActive} = true`),
   check('product_variant_stock_nonnegative', sql`${t.stock} >= 0`),
   check('product_variant_price_nonnegative', sql`${t.price} >= 0`),
 ]);

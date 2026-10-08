@@ -6,14 +6,15 @@ import { cn } from '@/lib/utils';
 import { Info, Check } from 'lucide-react';
 
 interface VariantSelectorProps {
+  initialVariant?: ProductVariant | null;
   product: Product;
   variants: ProductVariant[];
   onVariantSelect: (variant: ProductVariant | null) => void;
 }
 
-export function VariantSelector({ product, variants, onVariantSelect }: VariantSelectorProps) {
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
-  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(null);
+export function VariantSelector({ product, variants, onVariantSelect, initialVariant }: VariantSelectorProps) {
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(initialVariant?.attributes || {});
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(initialVariant || null);
 
   // Initialize selected options
   useEffect(() => {

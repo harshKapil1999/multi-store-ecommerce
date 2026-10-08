@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { Media } from '@repo/types';
 
 interface ImageGalleryProps {
@@ -44,9 +45,9 @@ export function ImageGallery({ featuredImage, mediaGallery, productName }: Image
                }`}
              >
                 {img.type === 'video' ? (
-                  <video src={img.url} className="w-full h-full object-cover" muted />
+                  <video preload="none" src={img.url} className="w-full h-full object-cover" muted />
                 ) : (
-                  <img src={img.url} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
+                  <Image width={80} height={80} sizes="80px" src={img.url} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
                 )}
              </button>
           ))}
@@ -64,7 +65,8 @@ export function ImageGallery({ featuredImage, mediaGallery, productName }: Image
               className="w-full h-full object-contain"
             />
           ) : (
-            <img
+            <Image
+              fill sizes="(max-width: 767px) 100vw, 50vw" fetchPriority="high" loading="eager"
               src={activeImage.url}
               alt={productName}
               className="w-full h-full object-cover object-center"

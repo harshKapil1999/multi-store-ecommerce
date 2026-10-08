@@ -1,0 +1,4 @@
+CREATE INDEX "product_store_newest_idx" ON "product" USING btree ("storeId","isActive","createdAt" DESC NULLS LAST,"_id" DESC NULLS LAST);--> statement-breakpoint
+CREATE INDEX "product_store_price_idx" ON "product" USING btree ("storeId","isActive","sellingPrice","_id");--> statement-breakpoint
+CREATE INDEX "product_category_price_idx" ON "product" USING btree ("storeId","isActive","categoryId","sellingPrice","_id");--> statement-breakpoint
+CREATE INDEX "product_variant_pack_price_idx" ON "product_variant" USING btree ("productId",("attributes"->>'Pack weight'),"price") WHERE "product_variant"."isActive" = true;

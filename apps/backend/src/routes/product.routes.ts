@@ -13,6 +13,7 @@ import { requireStoreAccess } from '../middleware/store-context';
 const router: Router = Router({ mergeParams: true });
 
 // Public routes
+router.get('/facets', validate(listProductsQuerySchema, 'query'), productController.getCatalogFacets);
 router.get('/', validate(listProductsQuerySchema, 'query'), productController.listProducts);
 router.get('/search/suggestions', productController.getSearchSuggestions);
 router.get('/featured', productController.getFeaturedProducts);

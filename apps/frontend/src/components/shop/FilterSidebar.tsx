@@ -4,10 +4,12 @@ import { CategoryWithChildren, Attribute } from '@repo/types';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
-import { JSX, useState } from 'react';
+import { JSX, useState, useTransition } from 'react';
 
 interface FilterSidebarProps {
   categories: CategoryWithChildren[];
+  priceBounds?: { min: number | null; max: number | null };
+  packSizes?: string[];
   storeSlug: string;
   activeCategoryId?: string;
   filterableAttributes?: { name: string; values: string[] }[];
@@ -18,19 +20,24 @@ export function FilterSidebar({
   categories, 
   storeSlug, 
   activeCategoryId,
+  priceBounds,
+  packSizes = [],
   filterableAttributes = [],
   onFilterChange
 }: FilterSidebarProps) {
   const router = useRouter(), pathname = usePathname(), searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const navigate = (url: string) => startTransition(() => router.push(url, { scroll: false }));
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     categories: true,
     price: true,
+    quantity: true,
     ...Object.fromEntries(filterableAttributes.map(attr => [attr.name, true]))
   });
   
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const selectedCount = Object.values(selectedFilters).reduce((count, values) => count + values.length, 0) + (searchParams.has('minPrice') || searchParams.has('maxPrice') ? 1 : 0);
+  const selectedCount = Object.values(selectedFilters).reduce((count, values) => count + values.length, 0) + (searchParams.has('minPrice') || searchParams.has('maxPrice') ? 1 : 0) + (searchParams.has('packSize') ? 1 : 0);
 
   const toggleSection = (section: string) => {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -51,7 +58,7 @@ export function FilterSidebar({
 
   const clearFilters = () => {
     setSelectedFilters({});
-    const query = new URLSearchParams(searchParams.toString()); query.delete('minPrice'); query.delete('maxPrice'); query.delete('page'); router.push(`${pathname}?${query}`);
+    const query = new URLSearchParams(searchParams.toString()); query.delete('minPrice'); query.delete('maxPrice'); query.delete('packSize'); query.delete('page'); navigate(`${pathname}?${query}`);
     onFilterChange?.({});
   };
 
@@ -108,12 +115,27 @@ export function FilterSidebar({
     );
   };
 
-  const priceRanges = [
-    { label: 'Under ₹2,500', min: 0, max: 2500 },
-    { label: '₹2,500 - ₹5,000', min: 2500, max: 5000 },
-    { label: '₹5,000 - ₹10,000', min: 5000, max: 10000 },
-    { label: 'Over ₹10,000', min: 10000, max: null },
-  ];
+  // Build useful bands from the unfiltered category/pack's real prices.
+  const priceRanges: { label: string; min: number; max: number | null }[] = [];
+  if (priceBounds?.min !== null && priceBounds?.max !== null && priceBounds?.min !== undefined && priceBounds?.max !== undefined) {
+    const { min, max } = priceBounds;
+    const rawStep = Math.max(1, (max - min) / 3);
+    const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+    const step = ([1, 2, 5, 10].find(n => n * magnitude >= rawStep) || 10) * magnitude;
+    const first = (Math.floor(min / step) + 1) * step;
+    const money = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+    priceRanges.push({ label: `Under ${money(first)}`, min: 0, max: Number((first - 0.01).toFixed(2)) });
+    if (max >= first) {
+      if (max >= first + step) priceRanges.push({ label: `${money(first)} to under ${money(first + step)}`, min: first, max: Number((first + step - 0.01).toFixed(2)) });
+      const lower = max >= first + step ? first + step : first;
+      priceRanges.push({ label: `${money(lower)} and above`, min: lower, max: null });
+    }
+  }
+  const selectPack = (value: string) => {
+    const query = new URLSearchParams(searchParams.toString()); query.delete('page'); query.delete('minPrice'); query.delete('maxPrice');
+    if (query.get('packSize') === value) query.delete('packSize'); else query.set('packSize', value);
+    navigate(`${pathname}?${query}`);
+  };
 
   return (
     <>
@@ -133,7 +155,7 @@ export function FilterSidebar({
         className="fixed inset-0 z-[65] bg-black/50 lg:hidden"
       />
     )}
-    <aside className={`${isMobileOpen ? 'fixed inset-y-0 right-0 z-[70] block w-[min(90vw,24rem)] bg-white p-6 dark:bg-black' : 'hidden'} h-full flex-shrink-0 overflow-y-auto scrollbar-thin lg:sticky lg:top-24 lg:block lg:h-[calc(100vh-6rem)] lg:w-72 lg:bg-transparent lg:p-0 lg:pr-6`}>
+    <aside aria-busy={isPending} className={`${isMobileOpen ? 'fixed inset-y-0 right-0 z-[70] block w-[min(90vw,24rem)] bg-white p-6 dark:bg-black' : 'hidden'} h-full flex-shrink-0 overflow-y-auto scrollbar-thin lg:sticky lg:top-24 lg:block lg:h-[calc(100vh-6rem)] lg:w-72 lg:bg-transparent lg:p-0 lg:pr-6`}>
        <div className="mb-6 flex items-center justify-between border-b border-gray-200 pb-4 dark:border-white/10 lg:hidden">
          <span className="text-xl font-semibold">Filters</span>
          <button type="button" onClick={() => setIsMobileOpen(false)} className="p-2" aria-label="Close filters">
@@ -155,6 +177,7 @@ export function FilterSidebar({
           )}
        </div>
        
+       <p role="status" aria-live="polite" className="mb-3 text-sm text-gray-500">{isPending ? 'Updating products…' : ''}</p>
        {/* Category Filter */}
        <div className="mb-6 border-b border-gray-200 pb-6 dark:border-white/10">
           <button 
@@ -224,8 +247,12 @@ export function FilterSidebar({
          </div>
        ))}
 
+       {packSizes.length > 0 && <div className="mb-6 border-b border-gray-200 pb-6 dark:border-white/10">
+          <button onClick={() => toggleSection('quantity')} className="mb-4 flex w-full items-center justify-between"><span className="text-lg font-semibold">Shop by Quantity</span>{openSections.quantity ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}</button>
+          {openSections.quantity && <div className="space-y-3">{[...packSizes].sort((a,b) => parseFloat(a) - parseFloat(b)).map(size => <label key={size} className="flex cursor-pointer items-center gap-3"><input type="checkbox" checked={searchParams.get('packSize') === size} onChange={() => selectPack(size)} className="h-6 w-6 rounded-md border-gray-400"/><span>{size} pack</span></label>)}</div>}
+       </div>}
        {/* Price Filter */}
-       <div className="mb-6 border-b border-gray-200 pb-6 dark:border-white/10">
+       {priceRanges.length > 0 && <div className="mb-6 border-b border-gray-200 pb-6 dark:border-white/10">
           <button 
             onClick={() => toggleSection('price')}
             className="mb-4 flex w-full items-center justify-between"
@@ -240,7 +267,7 @@ export function FilterSidebar({
                       <input
                         type="checkbox"
                         checked={searchParams.get('minPrice') === String(range.min) && searchParams.get('maxPrice') === (range.max === null ? null : String(range.max))}
-                        onChange={event => { const query = new URLSearchParams(searchParams.toString()); query.delete('page'); if (!event.target.checked) { query.delete('minPrice'); query.delete('maxPrice'); } else { query.set('minPrice', String(range.min)); if (range.max !== null) query.set('maxPrice', String(range.max)); else query.delete('maxPrice'); } router.push(`${pathname}?${query}`); }}
+                        onChange={event => { const query = new URLSearchParams(searchParams.toString()); query.delete('page'); if (!event.target.checked) { query.delete('minPrice'); query.delete('maxPrice'); } else { query.set('minPrice', String(range.min)); if (range.max !== null) query.set('maxPrice', String(range.max)); else query.delete('maxPrice'); } navigate(`${pathname}?${query}`); }}
                         className="h-6 w-6 rounded-md border-gray-400 text-black focus:ring-black dark:border-white/40 dark:bg-transparent dark:text-white"
                       />
                       <span className="text-base text-gray-700 transition-colors group-hover:text-black dark:text-gray-300 dark:group-hover:text-white">
@@ -250,7 +277,7 @@ export function FilterSidebar({
                 ))}
              </div>
           )}
-       </div>
+       </div>}
     </aside>
     </>
   );
